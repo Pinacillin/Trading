@@ -113,6 +113,14 @@ python scripts\steamdt_scan.py --mode holdings
 data/trades/holdings.csv
 ```
 
+安全导入持仓：
+
+```powershell
+python scripts\import_holdings.py your_holdings.csv
+```
+
+不要把 Steam 密码、2FA、网页登录 Cookie 或会话权限交给脚本。更多说明见 `docs/holdings_import.md`。
+
 交易记录：
 
 ```text

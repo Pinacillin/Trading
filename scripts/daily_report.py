@@ -46,7 +46,12 @@ def one_line(value: Any, limit: int = 300) -> str:
 def item_reason(item: dict[str, Any]) -> str:
     parts = item.get("score_parts", {})
     premium = item.get("bid_premium_pct")
-    premium_text = f"，买盘高于最低卖价 {fmt(premium, '%')}" if premium is not None else ""
+    if premium is not None and item.get("same_platform_exit_used"):
+        premium_text = f"，同平台买盘高于最低卖价 {fmt(premium, '%')}"
+    elif premium is not None:
+        premium_text = f"，跨平台/平台不明买盘高于最低卖价 {fmt(premium, '%')}"
+    else:
+        premium_text = ""
     return (
         f"7日 {fmt(item.get('change_7d_pct'), '%')}，30日 {fmt(item.get('change_30d_pct'), '%')}，"
         f"回撤 {fmt(item.get('drawdown_from_30d_high_pct'), '%')}，"

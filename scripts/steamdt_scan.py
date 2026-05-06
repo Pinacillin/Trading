@@ -288,15 +288,23 @@ def parse_price_batch(raw_data: Any) -> dict[str, dict[str, Any]]:
         bid_candidates = [p for p in parsed_platforms if p["bidding_price"] and p["bidding_price"] > 0]
         lowest = min(sell_candidates, key=lambda p: p["sell_price"], default=None)
         highest_bid = max(bid_candidates, key=lambda p: p["bidding_price"], default=None)
+        same_platform_bid = None
+        if lowest:
+            same_platform_bids = [p for p in bid_candidates if p["platform"] == lowest["platform"]]
+            same_platform_bid = max(same_platform_bids, key=lambda p: p["bidding_price"], default=None)
+        exit_bid = same_platform_bid or highest_bid
         if name:
             results[str(name)] = {
                 "platforms": parsed_platforms,
                 "lowest_sell_price": lowest["sell_price"] if lowest else None,
                 "lowest_sell_platform": lowest["platform"] if lowest else None,
                 "sell_order_count": lowest["sell_count"] if lowest else None,
-                "highest_buy_order": highest_bid["bidding_price"] if highest_bid else None,
-                "highest_buy_platform": highest_bid["platform"] if highest_bid else None,
-                "buy_order_count": highest_bid["bidding_count"] if highest_bid else None,
+                "highest_buy_order": exit_bid["bidding_price"] if exit_bid else None,
+                "highest_buy_platform": exit_bid["platform"] if exit_bid else None,
+                "buy_order_count": exit_bid["bidding_count"] if exit_bid else None,
+                "cross_platform_highest_buy_order": highest_bid["bidding_price"] if highest_bid else None,
+                "cross_platform_highest_buy_platform": highest_bid["platform"] if highest_bid else None,
+                "same_platform_exit_used": bool(same_platform_bid),
             }
     return results
 
@@ -348,6 +356,7 @@ def compute_item_metrics(
     raw_spread_pct = ((current_price - bid) / current_price * 100) if current_price and bid else None
     spread_pct = max(0.0, raw_spread_pct) if raw_spread_pct is not None else None
     bid_premium_pct = abs(raw_spread_pct) if raw_spread_pct is not None and raw_spread_pct < 0 else None
+    same_platform_exit_used = bool(price_info.get("same_platform_exit_used"))
     sector_score, sector = market_index_score(watch_item.category, indexes)
 
     momentum = clamp(((change_7d or 0) + 3) / 18 * 22, 0, 22)
@@ -369,6 +378,8 @@ def compute_item_metrics(
     depth_score = clamp(min(buy_depth, 50) / 50 * 7, 0, 7)
     supply_score = clamp(5 - min(sell_depth, 300) / 300 * 3, 0, 5)
     liquidity = spread_score + depth_score + supply_score
+    if bid_premium_pct is not None and not same_platform_exit_used:
+        liquidity = max(0, liquidity - 4)
 
     data_quality = 0
     if price_info.get("lowest_sell_price"):
@@ -409,6 +420,9 @@ def compute_item_metrics(
         "deviation_from_30d_avg_pct": round(dev_30, 2) if dev_30 is not None else None,
         "spread_pct": round(spread_pct, 2) if spread_pct is not None else None,
         "bid_premium_pct": round(bid_premium_pct, 2) if bid_premium_pct is not None else None,
+        "same_platform_exit_used": same_platform_exit_used,
+        "cross_platform_highest_buy_order": price_info.get("cross_platform_highest_buy_order"),
+        "cross_platform_highest_buy_platform": price_info.get("cross_platform_highest_buy_platform"),
         "sector": sector,
         "score_parts": {
             "momentum": round(momentum, 2),
@@ -492,6 +506,8 @@ def data_quality_notes(price_info: dict[str, Any], candles: list[dict[str, float
         notes.append("missing_lowest_sell_price")
     if not price_info.get("highest_buy_order"):
         notes.append("missing_buy_order")
+    elif not price_info.get("same_platform_exit_used"):
+        notes.append("exit_liquidity_cross_platform_or_unknown")
     if len(candles) < 7:
         notes.append("kline_less_than_7_days")
     elif len(candles) < 30:
