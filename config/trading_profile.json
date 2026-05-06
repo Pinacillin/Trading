@@ -1,0 +1,22 @@
+{
+  "style": "breakout_first",
+  "default_holding_days": 7,
+  "price_cap_cny": 1000,
+  "max_single_item_position_pct": 30,
+  "platform_preference": "lowest_price",
+  "excluded_terms": [
+    "case",
+    "weapon case",
+    "capsule",
+    "collection package",
+    "souvenir package"
+  ],
+  "discovery": {
+    "candidate_limit": 120,
+    "deep_scan_limit": 40,
+    "detail_prefetch_limit": 40,
+    "page_size": 50,
+    "max_pages": 5,
+    "request_sleep_seconds": 1.2
+  }
+}

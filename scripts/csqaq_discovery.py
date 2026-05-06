@@ -1,0 +1,547 @@
+"""CSQAQ discovery-first candidate generator for CS2 T+7 scans."""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+import os
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+
+ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_CSQAQ_BASE_URL = "https://api.csqaq.com"
+DEFAULT_PROFILE = {
+    "price_cap_cny": 1000,
+    "excluded_terms": ["case", "weapon case", "capsule", "collection package", "souvenir package"],
+    "discovery": {"candidate_limit": 120, "page_size": 50, "max_pages": 5},
+}
+
+
+@dataclass
+class DiscoveryCandidate:
+    market_hash_name: str
+    name: str
+    category: str
+    current_price: float | None
+    sell_count: int | None
+    buy_price: float | None
+    buy_count: int | None
+    change_1d_pct: float | None
+    change_7d_pct: float | None
+    change_30d_pct: float | None
+    source: str
+    raw: dict[str, Any]
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Discover fresh CS2 candidates from CSQAQ.")
+    parser.add_argument("--out", default="data/snapshots")
+    parser.add_argument("--profile", default="config/trading_profile.json")
+    parser.add_argument("--watchlist", default="config/watchlist.csv")
+    parser.add_argument("--price-cap", type=float)
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--detail-prefetch-limit", type=int)
+    parser.add_argument("--include-excluded", action="store_true")
+    return parser.parse_args()
+
+
+def load_dotenv(path: Path) -> None:
+    if not path.exists():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def load_profile(path: Path) -> dict[str, Any]:
+    profile = json.loads(json.dumps(DEFAULT_PROFILE))
+    if path.exists():
+        user_profile = json.loads(path.read_text(encoding="utf-8"))
+        deep_merge(profile, user_profile)
+    return profile
+
+
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> None:
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(base.get(key), dict):
+            deep_merge(base[key], value)
+        else:
+            base[key] = value
+
+
+def request_json(method: str, url: str, headers: dict[str, str] | None = None, body: Any = None) -> Any:
+    req_headers = dict(headers or {})
+    data = None
+    if body is not None:
+        data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        req_headers.setdefault("Content-Type", "application/json")
+    request = urllib.request.Request(url, data=data, headers=req_headers, method=method.upper())
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"HTTP {exc.code}: {detail[:500]}") from exc
+    except urllib.error.URLError as exc:
+        raise RuntimeError(f"Network error: {exc.reason}") from exc
+
+
+def api_data(response: Any) -> Any:
+    if isinstance(response, dict) and response.get("code") not in (None, 200):
+        raise RuntimeError(f"CSQAQ returned {response.get('code')}: {response.get('msg')}")
+    return response.get("data", response) if isinstance(response, dict) else response
+
+
+def to_float(value: Any) -> float | None:
+    try:
+        if value in (None, ""):
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def to_int(value: Any) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(float(value))
+    except (TypeError, ValueError):
+        return None
+
+
+def best_price(row: dict[str, Any]) -> float | None:
+    values = [
+        to_float(row.get("buff_sell_price")),
+        to_float(row.get("yyyp_sell_price")),
+        to_float(row.get("c5_sell_price")),
+        to_float(row.get("igxe_sell_price")),
+        to_float(row.get("r8_sell_price")),
+        to_float(row.get("steam_sell_price")),
+        to_float(row.get("sell_price")),
+        to_float(row.get("price")),
+    ]
+    values = [value for value in values if value and value > 0]
+    return min(values) if values else None
+
+
+def best_sell_count(row: dict[str, Any]) -> int | None:
+    values = [
+        to_int(row.get("buff_sell_num")),
+        to_int(row.get("yyyp_sell_num")),
+        to_int(row.get("c5_sell_num")),
+        to_int(row.get("igxe_sell_num")),
+        to_int(row.get("sell_num")),
+    ]
+    values = [value for value in values if value is not None]
+    return min(values) if values else None
+
+
+def best_buy(row: dict[str, Any]) -> tuple[float | None, int | None]:
+    prices = [
+        to_float(row.get("buff_buy_price")),
+        to_float(row.get("yyyp_buy_price")),
+        to_float(row.get("c5_buy_price")),
+        to_float(row.get("steam_buy_price")),
+        to_float(row.get("buy_price")),
+    ]
+    counts = [
+        to_int(row.get("buff_buy_num")),
+        to_int(row.get("yyyp_buy_num")),
+        to_int(row.get("c5_buy_num")),
+        to_int(row.get("steam_buy_num")),
+        to_int(row.get("buy_num")),
+    ]
+    price_values = [value for value in prices if value and value > 0]
+    count_values = [value for value in counts if value is not None]
+    return (max(price_values) if price_values else None, max(count_values) if count_values else None)
+
+
+def category_for(name: str, market_hash_name: str, row: dict[str, Any]) -> str:
+    localized = str(row.get("type_localized_name") or row.get("type") or "").lower()
+    text = f"{name} {market_hash_name} {localized}".lower()
+    if "sticker" in text or "印花" in text:
+        return "sticker"
+    if "glove" in text or "手套" in text:
+        return "gloves"
+    if "knife" in text or "匕首" in text:
+        return "knife"
+    if any(token in text for token in ["ak-47", "m4a", "awp", "usp-s", "glock", "desert eagle", "famas", "galil", "mp9", "mac-10"]):
+        return "main_weapon"
+    return "skin"
+
+
+def is_excluded(candidate: DiscoveryCandidate, excluded_terms: list[str]) -> str | None:
+    text = f"{candidate.category} {candidate.name} {candidate.market_hash_name}".lower()
+    for term in excluded_terms:
+        if term.lower() in text:
+            return term
+    return None
+
+
+def parse_candidate(row: dict[str, Any], source: str, id_map: dict[str, dict[str, Any]] | None = None) -> DiscoveryCandidate | None:
+    mapped = None
+    good_id = str(row.get("good_id") or row.get("id") or "")
+    if id_map and good_id:
+        mapped = id_map.get(good_id)
+    name = str(row.get("name") or (mapped or {}).get("name") or "").strip()
+    market_hash_name = str(
+        row.get("market_hash_name")
+        or row.get("marketHashName")
+        or (mapped or {}).get("market_hash_name")
+        or ""
+    ).strip()
+    if not market_hash_name:
+        return None
+    buy_price, buy_count = best_buy(row)
+    return DiscoveryCandidate(
+        market_hash_name=market_hash_name,
+        name=name,
+        category=category_for(name, market_hash_name, row),
+        current_price=best_price(row),
+        sell_count=best_sell_count(row),
+        buy_price=buy_price,
+        buy_count=buy_count,
+        change_1d_pct=to_float(row.get("sell_price_rate_1")),
+        change_7d_pct=to_float(row.get("sell_price_rate_7")),
+        change_30d_pct=to_float(row.get("sell_price_rate_30")),
+        source=source,
+        raw=row,
+    )
+
+
+def fetch_good_detail(base_url: str, headers: dict[str, str], good_id: Any) -> dict[str, Any] | None:
+    if good_id in (None, ""):
+        return None
+    response = request_json("GET", f"{base_url.rstrip()}/api/v1/info/good?{urllib.parse.urlencode({'id': good_id})}", headers=headers)
+    data = api_data(response)
+    if isinstance(data, dict):
+        goods_info = data.get("goods_info")
+        return goods_info if isinstance(goods_info, dict) else data
+    return None
+
+
+def discovery_score(candidate: DiscoveryCandidate, price_cap: float) -> float:
+    seven = candidate.change_7d_pct or 0
+    thirty = candidate.change_30d_pct or 0
+    one = candidate.change_1d_pct or 0
+    price_score = 12 if candidate.current_price is None else max(0, 12 - max(0, candidate.current_price - price_cap * 0.7) / price_cap * 12)
+    liquidity_score = min((candidate.buy_count or 0), 80) / 80 * 18
+    supply_score = 10 if candidate.sell_count is None else max(0, 10 - min(candidate.sell_count, 300) / 300 * 6)
+    momentum = max(0, min(35, (seven + 5) * 2.2)) + max(0, min(15, (thirty + 8) * 0.8)) + max(0, min(10, (one + 2) * 2.0))
+    return round(momentum + liquidity_score + supply_score + price_score, 2)
+
+
+def candidate_to_dict(candidate: DiscoveryCandidate, score: float) -> dict[str, Any]:
+    return {
+        "market_hash_name": candidate.market_hash_name,
+        "name": candidate.name,
+        "category": candidate.category,
+        "current_price": candidate.current_price,
+        "sell_count": candidate.sell_count,
+        "buy_price": candidate.buy_price,
+        "buy_count": candidate.buy_count,
+        "change_1d_pct": candidate.change_1d_pct,
+        "change_7d_pct": candidate.change_7d_pct,
+        "change_30d_pct": candidate.change_30d_pct,
+        "discovery_score": score,
+        "source": candidate.source,
+    }
+
+
+def fetch_current_indexes(base_url: str, api_key: str | None) -> list[dict[str, Any]]:
+    headers = {"ApiToken": api_key} if api_key else {}
+    response = request_json("GET", f"{base_url.rstrip()}/api/v1/current_data?type=init", headers=headers)
+    data = api_data(response)
+    return data.get("sub_index_data", []) if isinstance(data, dict) else []
+
+
+def fetch_all_goods_info(base_url: str, headers: dict[str, str]) -> list[dict[str, Any]]:
+    response = request_json("POST", f"{base_url.rstrip()}/api/v1/goods/get_all_goods_info", headers=headers)
+    data = api_data(response)
+    return data if isinstance(data, list) else []
+
+
+def fetch_id_map(base_url: str, headers: dict[str, str]) -> dict[str, dict[str, Any]]:
+    response = request_json("POST", f"{base_url.rstrip()}/api/v1/goods/get_all_goods_id", headers=headers)
+    data = api_data(response)
+    if isinstance(data, dict):
+        return {str(key): value for key, value in data.items() if isinstance(value, dict)}
+    return {}
+
+
+def fetch_all_goods_rank(base_url: str, headers: dict[str, str]) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    id_map = fetch_id_map(base_url, headers)
+    response = request_json("POST", f"{base_url.rstrip()}/api/v1/goods/get_all_goods_rank", headers=headers)
+    data = api_data(response)
+    rank_info = data.get("rank_info", {}) if isinstance(data, dict) else {}
+    rows = list(rank_info.values()) if isinstance(rank_info, dict) else []
+    return [row for row in rows if isinstance(row, dict)], id_map
+
+
+def fetch_rank_pages(base_url: str, headers: dict[str, str], page_size: int, max_pages: int, request_sleep: float) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    sort_filters = [
+        "价格_涨幅(7日)_降序(BUFF)",
+        "价格_涨幅(7日)_降序(悠悠有品)",
+        "价格_涨幅(30日)_降序(BUFF)",
+        "价格_售价减求购价(百分比)_升序(BUFF)",
+    ]
+    request_count = 0
+    for sort_filter in sort_filters:
+        for page in range(1, max_pages + 1):
+            if request_count:
+                time.sleep(request_sleep)
+            body = {
+                "page_index": page,
+                "page_size": page_size,
+                "show_recently_price": True,
+                "filter": {"排序": [sort_filter]},
+            }
+            response = request_json("POST", f"{base_url.rstrip()}/api/v1/info/get_rank_list", headers=headers, body=body)
+            request_count += 1
+            data = api_data(response)
+            page_rows = data.get("data", []) if isinstance(data, dict) else []
+            if not page_rows:
+                break
+            rows.extend([row for row in page_rows if isinstance(row, dict)])
+    return rows
+
+
+def read_watchlist_fallback(path: Path) -> list[dict[str, Any]]:
+    if not path.exists():
+        return []
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8-sig", newline="") as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            rows.append(
+                {
+                    "market_hash_name": row.get("market_hash_name"),
+                    "name": row.get("market_hash_name"),
+                    "category": row.get("category"),
+                    "source_notes": row.get("notes"),
+                }
+            )
+    return rows
+
+
+def dedupe_candidates(candidates: list[DiscoveryCandidate]) -> list[DiscoveryCandidate]:
+    merged: dict[str, DiscoveryCandidate] = {}
+    for candidate in candidates:
+        existing = merged.get(candidate.market_hash_name)
+        if existing is None or discovery_score(candidate, 1000) > discovery_score(existing, 1000):
+            merged[candidate.market_hash_name] = candidate
+    return list(merged.values())
+
+
+def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
+    load_dotenv(ROOT / ".env")
+    base_url = os.environ.get("CSQAQ_BASE_URL", DEFAULT_CSQAQ_BASE_URL)
+    api_key = os.environ.get("CSQAQ_API_KEY")
+    headers = {"ApiToken": api_key or "", "Content-Type": "application/json"}
+    price_cap = float(getattr(args, "price_cap", None) or profile.get("price_cap_cny") or 1000)
+    limit = int(getattr(args, "limit", None) or profile.get("discovery", {}).get("candidate_limit") or 120)
+    page_size = int(profile.get("discovery", {}).get("page_size") or 50)
+    max_pages = int(profile.get("discovery", {}).get("max_pages") or 5)
+    request_sleep = float(profile.get("discovery", {}).get("request_sleep_seconds") or 1.2)
+    excluded_terms = list(profile.get("excluded_terms") or DEFAULT_PROFILE["excluded_terms"])
+    detail_prefetch_limit = int(
+        getattr(args, "detail_prefetch_limit", None)
+        or profile.get("discovery", {}).get("detail_prefetch_limit")
+        or min(limit * 3, 40)
+    )
+
+    errors: list[str] = []
+    source_status = "unknown"
+    rows: list[dict[str, Any]] = []
+    id_map: dict[str, dict[str, Any]] | None = None
+
+    for idx, (source_name, fetcher) in enumerate((
+        ("csqaq_rank_pages", lambda: (fetch_rank_pages(base_url, headers, page_size, max_pages, request_sleep), None)),
+        ("csqaq_all_goods_info", lambda: (fetch_all_goods_info(base_url, headers), None)),
+        ("csqaq_all_goods_rank", lambda: fetch_all_goods_rank(base_url, headers)),
+    )):
+        if idx:
+            time.sleep(request_sleep)
+        try:
+            rows, id_map = fetcher()
+            if rows:
+                source_status = source_name
+                break
+        except RuntimeError as exc:
+            message = f"{source_name}: {exc}"
+            errors.append(message)
+            if "HTTP 429" in message:
+                break
+
+    if not rows:
+        rows = read_watchlist_fallback(ROOT / getattr(args, "watchlist", "config/watchlist.csv"))
+        source_status = "fallback_watchlist"
+
+    candidates: list[DiscoveryCandidate] = []
+    needs_detail: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for row in rows:
+        candidate = parse_candidate(row, source_status, id_map)
+        if not candidate:
+            if row.get("id") or row.get("good_id"):
+                needs_detail.append(row)
+            continue
+        reason = is_excluded(candidate, excluded_terms)
+        if reason and not getattr(args, "include_excluded", False):
+            excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+            continue
+        if candidate.current_price is not None and candidate.current_price > price_cap:
+            excluded.append(
+                {
+                    "market_hash_name": candidate.market_hash_name,
+                    "reason": f"price_above_{price_cap}",
+                    "current_price": candidate.current_price,
+                    "source": candidate.source,
+                }
+            )
+            continue
+        candidates.append(candidate)
+
+    if needs_detail:
+        rough_rows = []
+        for row in needs_detail:
+            current_price = best_price(row)
+            if current_price is not None and current_price > price_cap:
+                excluded.append(
+                    {
+                        "market_hash_name": row.get("name") or row.get("id"),
+                        "reason": f"price_above_{price_cap}",
+                        "current_price": current_price,
+                        "source": source_status,
+                    }
+                )
+                continue
+            rough_score = discovery_score(
+                DiscoveryCandidate(
+                    market_hash_name=str(row.get("name") or row.get("id")),
+                    name=str(row.get("name") or ""),
+                    category=category_for(str(row.get("name") or ""), "", row),
+                    current_price=current_price,
+                    sell_count=best_sell_count(row),
+                    buy_price=best_buy(row)[0],
+                    buy_count=best_buy(row)[1],
+                    change_1d_pct=to_float(row.get("sell_price_rate_1")),
+                    change_7d_pct=to_float(row.get("sell_price_rate_7")),
+                    change_30d_pct=to_float(row.get("sell_price_rate_30")),
+                    source=source_status,
+                    raw=row,
+                ),
+                price_cap,
+            )
+            rough_rows.append((rough_score, row))
+        rough_rows.sort(key=lambda item: item[0], reverse=True)
+        for idx, (_, row) in enumerate(rough_rows[:detail_prefetch_limit]):
+            if idx:
+                time.sleep(request_sleep)
+            try:
+                detail = fetch_good_detail(base_url, headers, row.get("id") or row.get("good_id"))
+            except RuntimeError as exc:
+                errors.append(f"csqaq_good_detail:{row.get('id')}: {exc}")
+                continue
+            if not detail:
+                continue
+            merged = dict(row)
+            merged.update(detail)
+            candidate = parse_candidate(merged, f"{source_status}+good_detail", id_map)
+            if not candidate:
+                continue
+            reason = is_excluded(candidate, excluded_terms)
+            if reason and not getattr(args, "include_excluded", False):
+                excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+                continue
+            if candidate.current_price is not None and candidate.current_price > price_cap:
+                excluded.append(
+                    {
+                        "market_hash_name": candidate.market_hash_name,
+                        "reason": f"price_above_{price_cap}",
+                        "current_price": candidate.current_price,
+                        "source": candidate.source,
+                    }
+                )
+                continue
+            candidates.append(candidate)
+
+    scored = [
+        (candidate, discovery_score(candidate, price_cap))
+        for candidate in dedupe_candidates(candidates)
+    ]
+    scored.sort(key=lambda row: row[1], reverse=True)
+    top = scored[:limit]
+
+    indexes: list[dict[str, Any]] = []
+    if not any("HTTP 429" in error for error in errors):
+        try:
+            indexes = fetch_current_indexes(base_url, api_key)
+        except RuntimeError as exc:
+            errors.append(f"csqaq_current_data: {exc}")
+
+    return {
+        "snapshot_time": datetime.now(timezone.utc).astimezone().isoformat(),
+        "source": {
+            "csqaq": {
+                "base_url": base_url,
+                "source_status": source_status,
+                "is_full_market": source_status in {"csqaq_all_goods_info", "csqaq_all_goods_rank"},
+                "fallback_used": source_status == "fallback_watchlist",
+            }
+        },
+        "filters": {
+            "price_cap_cny": price_cap,
+            "candidate_limit": limit,
+            "excluded_terms": excluded_terms,
+            "include_excluded": getattr(args, "include_excluded", False),
+        },
+        "market_indexes": indexes,
+        "candidates": [candidate_to_dict(candidate, score) for candidate, score in top],
+        "excluded_count": len(excluded),
+        "excluded_sample": excluded[:50],
+        "raw_count": len(rows),
+        "candidate_count": len(top),
+        "errors": errors,
+    }
+
+
+def write_discovery(discovery: dict[str, Any], out_dir: Path) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y-%m-%d-%H%M%S")
+    path = out_dir / f"{stamp}-cs2-discovery.json"
+    path.write_text(json.dumps(discovery, ensure_ascii=False, indent=2), encoding="utf-8")
+    return path
+
+
+def main() -> int:
+    args = parse_args()
+    profile_path = (ROOT / args.profile).resolve() if not Path(args.profile).is_absolute() else Path(args.profile)
+    profile = load_profile(profile_path)
+    discovery = build_discovery(profile, args)
+    out_dir = (ROOT / args.out).resolve() if not Path(args.out).is_absolute() else Path(args.out)
+    path = write_discovery(discovery, out_dir)
+    print(f"Wrote discovery: {path}")
+    print(f"Source: {discovery['source']['csqaq']['source_status']}; candidates: {discovery['candidate_count']}; excluded: {discovery['excluded_count']}")
+    if discovery.get("errors"):
+        print("Warnings:")
+        for error in discovery["errors"][:5]:
+            print(f"- {error[:300]}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

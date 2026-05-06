@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+data/snapshots/*.json
+data/snapshots/*.csv
+data/backtests/results/
+reports/*.html
+reports/*.md

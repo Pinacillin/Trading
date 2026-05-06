@@ -1,0 +1,72 @@
+# CSQAQ 数据开放API
+
+## Docs
+- 快速开始 [项目引言](https://docs.csqaq.com/doc-4588851.md): 
+- 快速开始 [接入指南](https://docs.csqaq.com/doc-4588854.md): 
+- 快速开始 [数据说明](https://docs.csqaq.com/doc-4589773.md): 
+- 接口详情 >  涨跌/热门排行 > 获取排行榜信息 [排行榜接口Body参数](https://docs.csqaq.com/doc-4619235.md): 
+
+## API Docs
+- 接口详情 > 绑定本机白名单IP [绑定本机白名单IP](https://docs.csqaq.com/api-342090738.md): 🥇 为当前请求的API_TOKEN绑定本机的IP地址，适用于非固定IP场景下使用
+- 接口详情 > 饰品指数 [获取首页相关数据](https://docs.csqaq.com/api-187131779.md): 🥇 获取本站 [CSQAQ-首页](https://csqaq.com/home) 记录的饰品指数信息，包括指数数据、涨跌分布、在线人数数据、今日指数走势等
+- 接口详情 > 饰品指数 [获取指数详情数据](https://docs.csqaq.com/api-230764015.md): 🥇 获取本站 [CSQAQ-首页](https://csqaq.com/home) 记录的指数数据  -> 包括今天涨跌数据、图表的数据
+- 接口详情 > 饰品指数 [获取指数K线图](https://docs.csqaq.com/api-278085071.md): 🥇 获取本站 [CSQAQ-首页](https://csqaq.com/home) 记录的指数K线图数据 
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取全量站内饰品ID](https://docs.csqaq.com/api-337690892.md): 🥇 **全量**获取的网站内所有的饰品id，用以映射饰品ID-饰品名-饰品hash名称，提供给需要good_id的接口请求使用
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取全量饰品价格数据](https://docs.csqaq.com/api-327138094.md): 🥇 **全量**获取所有统计在内的饰品价格和在售数据接口
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取全量饰品排行榜数据](https://docs.csqaq.com/api-337683199.md): 🥇 **全量**获取的所有饰品的排行榜数据和近7天价格接口
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取单件饰品k线数据](https://docs.csqaq.com/api-278065737.md): 🥇 获取单件饰品的多平台、各周期的分段K线图数据
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取全量饰品热度排名](https://docs.csqaq.com/api-327157635.md): 🥇 **全量**获取热门饰品的数据列表（对应网站首页页面 [CSQAQ-大家都在看](https://csqaq.com/home) ）
+- 接口详情 > 饰品详情 > 企业合作用户接口 [获取饰品模板数据](https://docs.csqaq.com/api-366480732.md): 🥇 **分页请求**获取所有统计在内的饰品模板数据接口
+- 接口详情 > 饰品详情 [获取饰品的ID信息](https://docs.csqaq.com/api-187131777.md): 🥇 获取本站所记录的饰品的库表ID信息，用于请求其他接口时所需的good_id
+- 接口详情 > 饰品详情 [联想查询饰品的ID信息](https://docs.csqaq.com/api-189290586.md): 🥇 饰品名称联想查询，获取本站所记录的饰品的库表ID信息，用于请求其他接口时所需的good_id
+- 接口详情 > 饰品详情 [获取单件饰品详情](https://docs.csqaq.com/api-187131780.md): 🥇 获取单件饰品的详细数据接口，需用饰品good_id进行请求，good_id获取接口为 [获取饰品的ID信息](http://docs.csqaq.com/api-187131777)
+- 接口详情 > 饰品详情 [获取单件饰品存世量走势](https://docs.csqaq.com/api-366480669.md): 🥇 获取单件饰品的存世量走势（近180天），需用饰品good_id进行请求，good_id获取接口为 [获取饰品的ID信息](http://docs.csqaq.com/api-187131777)
+- 接口详情 > 饰品详情 [批量获取饰品出售价格数据](https://docs.csqaq.com/api-283470032.md): 🥇 批量获取饰品的价格和在售数据接口，通过饰品marketHashName进行请求
+- 接口详情 > 饰品详情 [获取单件饰品图表数据](https://docs.csqaq.com/api-187131781.md): 🥇 获取单件饰品的多平台、各周期的图表数据（包括BUFF、悠悠有品、Steam平台的出售价、求购价、短租租金、长租租金、短租收益率、长租收益率、在售数量、求购数量、在租数量、日成交量、租赁过户价）
+- 接口详情 > 饰品详情 [获取单件饰品全量图表数据 (暂停使用)](https://docs.csqaq.com/api-187131782.md): 🥇 获取单件饰品的全量图表数据（仅包含在售价和在售数量）需用饰品good_id进行请求，good_id获取接口为 [获取饰品的ID信息](http://docs.csqaq.com/api-187131777)
+- 接口详情 >  涨跌/热门排行 > 获取排行榜信息 [获取排行榜单信息接口](https://docs.csqaq.com/api-187131776.md): 🥇 获取全站所有饰品的各个指标（价格、租赁、挂刀套现、成交量、存世量、饰品总市值、在售数量、求购数量、在租数量）的排行榜数据
+- 接口详情 >  涨跌/热门排行 [获取饰品列表信息](https://docs.csqaq.com/api-187131775.md): 🥇 获取全站所有饰品的列表信息数据（对应网站页面 [CSQAQ-饰品列表](https://csqaq.com/detail) ）
+- 接口详情 >  涨跌/热门排行 [获取热门系列饰品列表](https://docs.csqaq.com/api-187131803.md): 🥇 获取统计的热门系列饰品列表数据（对应网站页面 [CSQAQ-热门系列](https://csqaq.com/series) ）
+- 接口详情 >  涨跌/热门排行 [获取单件热门系列饰品详情](https://docs.csqaq.com/api-187131804.md): 🥇 获取对应单件热门饰品系列的详情数据，需用series_id进行请求，series_id获取接口为 [获取热门系列饰品列表](http://docs.csqaq.com/api-187131803)
+- 接口详情 >  挂刀行情数据 [获取挂刀行情详情信息](https://docs.csqaq.com/api-187131823.md): 🥇 获取交易平台和Steam市场余额兑换行情数据（对应网站页面 [CSQAQ-挂刀行情详情](https://csqaq.com/exchange) ）
+- 接口详情 > 库存监控 [获取库存监控最新动态](https://docs.csqaq.com/api-187131809.md): 🥇 获取本站Steam库存监控的库存变动动态（对应网站页面 [CSQAQ-库存变动监控](https://csqaq.com/monitor) ）
+- 接口详情 > 库存监控 [获取库存监控任务列表](https://docs.csqaq.com/api-187131810.md): 🥇 获取Steam库存监控的任务列表，支持模糊检索Steam用户名和ID（对应网站页面 [CSQAQ-库存变动监控](https://csqaq.com/monitor) ）
+- 接口详情 > 库存监控 [获取库存监控持有量排行榜](https://docs.csqaq.com/api-187131813.md): 🥇 获取库存监控中饰品持有量排行榜，默认降序排行，需用饰品good_id进行请求，good_id获取接口为 [获取饰品的ID信息](http://docs.csqaq.com/api-187131777)
+- 接口详情 > 库存监控 [获取监控单个用户信息](https://docs.csqaq.com/api-187131814.md): 🥇 获取库存监控中单个用户的信息，需用任务task_id进行请求，task_id获取接口为 [获取库存监控任务列表](http://docs.csqaq.com/api-187131810)
+- 接口详情 > 库存监控 [获取监控单个用户库存动态](https://docs.csqaq.com/api-358158458.md): 🥇 获取库存监控中单个用户的库存动态信息，需用任务task_id进行请求，task_id获取接口为 [获取库存监控任务列表](http://docs.csqaq.com/api-187131810)
+- 接口详情 > 库存监控 [获取监控单个用户全部库存](https://docs.csqaq.com/api-187131815.md): 🥇 获取库存监控中单个用户的全部库存内容，需用任务task_id进行请求，task_id获取接口为 [获取库存监控任务列表](http://docs.csqaq.com/api-187131810)
+- 接口详情 > 库存监控 [获取监控单个用户库存快照列表](https://docs.csqaq.com/api-343919624.md): 🥇 获取库存监控中单个用户的库存快照列表，库存快照任务snapshot_id，可以用来调用 [获取监控单个用户全部库存
+- 接口详情 >  武器箱数据 [获取武器箱开箱数量统计](https://docs.csqaq.com/api-187131788.md): 🥇 获取武器箱的开箱数量详情数据（对应网站页面 [CSQAQ-开箱数据-开箱数量统计](https://csqaq.com/stat/case) ）
+- 接口详情 >  武器箱数据 [获取武器箱开箱回报率列表](https://docs.csqaq.com/api-294405260.md): 🥇 获取武器箱的开箱回报率数据列表（对应网站页面 [CSQAQ-开箱数据-开箱回报率](https://csqaq.com/stat/case) ）
+- 接口详情 >  武器箱数据 [获取单个武器箱开箱回报率走势](https://docs.csqaq.com/api-327163706.md): 🥇 获取获取单个武器箱开箱回报率走势（对应网站页面 [CSQAQ-开箱数据-开箱回报率](https://csqaq.com/stat/case) ）点击的武器箱走势
+- 接口详情 >  武器箱数据 [获取单个武器箱历史开箱量](https://docs.csqaq.com/api-187131799.md): 🥇 获取对应单件武器箱的每日开箱数的历史数据，需用case_id进行请求，case_id获取接口为 [获取武器箱开箱数据](http://docs.csqaq.com/api-187131788)
+- 接口详情 >  武器箱数据 [获取所有收藏品列表](https://docs.csqaq.com/api-187131826.md): 🥇 获取游戏内所有的武器箱、收藏品总览数据（对应网站页面 [CSQAQ-收藏品总览](https://csqaq.com/container) ）
+- 接口详情 >  武器箱数据 [获取单个收藏品的包含物](https://docs.csqaq.com/api-187131825.md): 🥇 获取对应单个收藏品里面包含的饰品，需用收藏品id进行请求，收藏品id获取接口为 [获取所有收藏品列表数据](http://docs.csqaq.com/api-187131826)
+- 接口详情 > 实时成交数据（暂停更新） [获取成交量数据信息](https://docs.csqaq.com/api-187131821.md): 🥇 获取交易平台实时成交量数据（对应网站页面 [CSQAQ-平台实时成交](https://csqaq.com/vol) ）
+- 接口详情 > 实时成交数据（暂停更新） [获取成交量图表/磨损信息](https://docs.csqaq.com/api-187131822.md): 🥇 获取单件饰品的实时成交量历史图表和磨损数据，需用vol_id进行请求，vol_id获取接口为 [获取成交量数据信息](http://docs.csqaq.com/api-187131821)
+- 接口详情 > Banana(挂香蕉)数据(暂停更新) [获取所有Banana列表数据](https://docs.csqaq.com/api-187131827.md): 🥇 获取Steam所有Banana详情数据（对应网站页面 [CSQAQ-Banana趋势专区](https://csqaq.com/banana) ）
+- 接口详情 > Banana(挂香蕉)数据(暂停更新) [获取单件Banana图表数据](https://docs.csqaq.com/api-187131828.md): 🥇 获取对应单件Banana的图表数据，需用good_id进行请求，good_id获取接口为 [获取所有Banana列表数据](http://docs.csqaq.com/api-187131827)
+
+## Schemas
+- Schemas [AddReduceCollectionDetail](https://docs.csqaq.com/schema-104580644.md): 
+- Schemas [ChartAllReq](https://docs.csqaq.com/schema-104580645.md): 
+- Schemas [CollectionImport](https://docs.csqaq.com/schema-104580646.md): 
+- Schemas [CollectionOperate](https://docs.csqaq.com/schema-104580647.md): 
+- Schemas [CreateQrCode](https://docs.csqaq.com/schema-104580648.md): 
+- Schemas [CreateUid](https://docs.csqaq.com/schema-104580649.md): 
+- Schemas [DataSchema](https://docs.csqaq.com/schema-104580650.md): 
+- Schemas [ExchangeReq](https://docs.csqaq.com/schema-104580651.md): 
+- Schemas [GetCaseChartReq](https://docs.csqaq.com/schema-104580652.md): 
+- Schemas [GetChartReq](https://docs.csqaq.com/schema-104580653.md): 
+- Schemas [GetFloatReq](https://docs.csqaq.com/schema-104580654.md): 
+- Schemas [GetMonitorListReq](https://docs.csqaq.com/schema-104580655.md): 
+- Schemas [GetPagedListReq](https://docs.csqaq.com/schema-104580656.md): 
+- Schemas [HTTPValidationError](https://docs.csqaq.com/schema-104580657.md): 
+- Schemas [InventoryCheckReq](https://docs.csqaq.com/schema-104580658.md): 
+- Schemas [MachineCheckReq](https://docs.csqaq.com/schema-104580659.md): 
+- Schemas [RefreshTaskReq](https://docs.csqaq.com/schema-104580660.md): 
+- Schemas [SendSmsReq](https://docs.csqaq.com/schema-104580661.md): 
+- Schemas [TaskOperateReq](https://docs.csqaq.com/schema-104580662.md): 
+- Schemas [UpdateCollectionDetail](https://docs.csqaq.com/schema-104580663.md): 
+- Schemas [ValidationError](https://docs.csqaq.com/schema-104580664.md): 
+- Schemas [VolHistoryReq](https://docs.csqaq.com/schema-104580665.md): 

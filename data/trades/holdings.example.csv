@@ -1,0 +1,2 @@
+holding_id,opened_at,t7_unlock_at,market_hash_name,category,platform,quantity,entry_price,total_cost,stop_price,target_price,status,plan,notes
+example-001,2026-05-06,2026-05-13,AK-47 | Slate (Field-Tested),main_weapon,YOUPIN,1,30.00,30.00,28.50,33.00,open,example only,replace with real holdings before use
