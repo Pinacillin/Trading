@@ -72,6 +72,25 @@ discovery > watchlist
 - 按价格上限、7 日涨幅、30 日涨幅、在售数量、求购数量、板块强弱筛选。
 - 保留 50-200 个候选。
 
+### CSQAQ 白名单规则
+
+CSQAQ 的 Token 白名单绑定的是当前运行环境的公网 IP，不是 GitHub 仓库，也不是 Codex 账号。
+
+因此：
+
+- 本地电脑第一次使用时，要在本地运行 `python scripts\csqaq_healthcheck.py --bind-ip`。
+- Web Codex / Cloud Codex 第一次使用时，要在云端终端运行 `python scripts/csqaq_healthcheck.py --bind-ip`。
+- 如果本地公网 IP 变化、云端环境重建、或健康检查出现 `401`，需要重新绑定当前环境。
+- 绑定接口限制为 30 秒/次，绑定后等待 30 秒再运行健康检查。
+
+健康检查命令：
+
+```bash
+python scripts/csqaq_healthcheck.py
+```
+
+只有 `current_data` 和 `rank_list` 都返回 `http=200`，才说明 discovery 可以正常拉新候选。
+
 第二层：SteamDT 验证
 
 - 用 `price/batch` 查平台最低价、最高求购价、卖单和买盘深度。

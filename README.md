@@ -59,13 +59,29 @@ python scripts\steamdt_scan.py
 python scripts\csqaq_healthcheck.py
 ```
 
-只有白名单 IP 变化时才绑定：
+### CSQAQ IP Whitelist
+
+CSQAQ 的 API Token 绑定的是“当前运行环境的公网 IP”。本地电脑和 Web Codex / Cloud Codex 的公网 IP 不一样，所以每个环境第一次使用时都要各自绑定一次。
+
+本地第一次运行，或本地公网 IP 变化后：
 
 ```powershell
 python scripts\csqaq_healthcheck.py --bind-ip
 ```
 
-CSQAQ 的绑定接口限制为 30 秒/次，不要连续点击或连续运行。
+Web Codex / Cloud Codex 第一次运行，或云端环境重建后，也要在云端终端里重新运行同一条命令：
+
+```bash
+python scripts/csqaq_healthcheck.py --bind-ip
+```
+
+CSQAQ 的绑定接口限制为 30 秒/次，不要连续点击或连续运行。绑定后等 30 秒，再检查：
+
+```bash
+python scripts/csqaq_healthcheck.py
+```
+
+看到 `current_data: http=200` 和 `rank_list: http=200` 后，再运行扫描。
 
 只复查观察池：
 
