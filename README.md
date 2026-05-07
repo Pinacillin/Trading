@@ -138,3 +138,44 @@ python scripts\portfolio_review.py
 ```powershell
 python scripts\t7_review.py
 ```
+
+## Chart Analysis Loop
+
+TradingView / KairoTrend 风格图表分析规则在：
+
+```text
+skills/trading_analysis/
+docs/chart_analysis_rules.md
+```
+
+创建一条图表分析记录：
+
+```powershell
+python scripts\new_chart_analysis.py --symbol BTCUSDT --timeframe 1h --market crypto --bias wait --trend range --notes "range middle, wait for breakout"
+```
+
+截图放在：
+
+```text
+data/charts/screenshots/
+```
+
+OHLCV CSV 放在：
+
+```text
+data/charts/ohlcv/
+```
+
+汇总图表分析复盘：
+
+```powershell
+python scripts\summarize_chart_journal.py
+```
+
+对 OHLCV CSV 做简单突破策略回测：
+
+```powershell
+python scripts\backtest_strategy.py data\charts\ohlcv\sample.csv
+```
+
+图表分析 MVP 的目标是先稳定记录 30-50 个样本，再根据实际结果调整规则；不要把单次截图分析当作确定预测。

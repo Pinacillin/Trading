@@ -71,7 +71,7 @@ trade_id,opened_at,closed_at,market,type,symbol,bucket,entry_price,stop_price,ta
 保存路径：
 
 ```text
-data/charts/YYYY-MM-DD-symbol-timeframe.md
+data/charts/journal/YYYYMMDD-HHMMSS-symbol-timeframe.md
 ```
 
 字段：
@@ -84,3 +84,35 @@ data/charts/YYYY-MM-DD-symbol-timeframe.md
 - 风险回报比。
 - 无效条件。
 - 复盘结论。
+
+结构化索引：
+
+```text
+data/charts/journal/chart_analyses.csv
+```
+
+字段：
+
+```text
+analysis_id,created_at,source,symbol,timeframe,market,bias,trend,setup_type,entry,stop_loss,take_profit,risk_reward,confidence,status,screenshot_path,data_path,notes,result_at,result_price,result_r,result_notes
+```
+
+## OHLCV backtest input
+
+保存路径：
+
+```text
+data/charts/ohlcv/*.csv
+```
+
+必需字段：
+
+```text
+timestamp,open,high,low,close,volume
+```
+
+回测输出：
+
+```text
+data/backtests/results/*-backtest.json
+```

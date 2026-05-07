@@ -6,6 +6,8 @@ __pycache__/
 
 data/snapshots/*.json
 data/snapshots/*.csv
-data/backtests/results/
+data/backtests/results/*
+!data/backtests/results/.gitkeep
+data/charts/journal/chart-*.md
 reports/*.html
 reports/*.md
