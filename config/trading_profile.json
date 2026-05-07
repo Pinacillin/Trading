@@ -11,6 +11,14 @@
     "collection package",
     "souvenir package"
   ],
+  "allowed_skin_wears": [
+    "Factory New",
+    "崭新出厂"
+  ],
+  "allowed_sticker_terms": [
+    "Holo",
+    "全息"
+  ],
   "discovery": {
     "candidate_limit": 120,
     "deep_scan_limit": 40,

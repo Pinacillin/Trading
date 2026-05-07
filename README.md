@@ -51,7 +51,7 @@ Copy-Item .env.example .env
 python scripts\steamdt_scan.py
 ```
 
-脚本会先拉 CSQAQ 最新候选，再用 SteamDT 做深度验证。默认单品价格上限是 1000 CNY，不碰箱子、收藏包和胶囊。
+脚本会先拉 CSQAQ 最新候选，再用 SteamDT 做深度验证。默认单品价格上限是 1000 CNY，不碰箱子、收藏包和胶囊；皮肤只看崭新出厂 / Factory New，印花只看全息 / Holo。
 
 检查 CSQAQ 接口状态：
 

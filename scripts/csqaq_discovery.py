@@ -21,6 +21,8 @@ DEFAULT_CSQAQ_BASE_URL = "https://api.csqaq.com"
 DEFAULT_PROFILE = {
     "price_cap_cny": 1000,
     "excluded_terms": ["case", "weapon case", "capsule", "collection package", "souvenir package"],
+    "allowed_skin_wears": ["Factory New", "崭新出厂"],
+    "allowed_sticker_terms": ["Holo", "全息"],
     "discovery": {"candidate_limit": 120, "page_size": 50, "max_pages": 5},
 }
 
@@ -190,6 +192,21 @@ def is_excluded(candidate: DiscoveryCandidate, excluded_terms: list[str]) -> str
     return None
 
 
+def wear_or_sticker_filter(
+    candidate: DiscoveryCandidate,
+    allowed_skin_wears: list[str],
+    allowed_sticker_terms: list[str],
+) -> str | None:
+    text = f"{candidate.name} {candidate.market_hash_name}".lower()
+    if candidate.category == "sticker":
+        if any(term.lower() in text for term in allowed_sticker_terms):
+            return None
+        return "non_holo_sticker"
+    if any(term.lower() in text for term in allowed_skin_wears):
+        return None
+    return "missing_factory_new_wear"
+
+
 def parse_candidate(row: dict[str, Any], source: str, id_map: dict[str, dict[str, Any]] | None = None) -> DiscoveryCandidate | None:
     mapped = None
     good_id = str(row.get("good_id") or row.get("id") or "")
@@ -357,6 +374,8 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
     max_pages = int(profile.get("discovery", {}).get("max_pages") or 5)
     request_sleep = float(profile.get("discovery", {}).get("request_sleep_seconds") or 1.2)
     excluded_terms = list(profile.get("excluded_terms") or DEFAULT_PROFILE["excluded_terms"])
+    allowed_skin_wears = list(profile.get("allowed_skin_wears") or DEFAULT_PROFILE["allowed_skin_wears"])
+    allowed_sticker_terms = list(profile.get("allowed_sticker_terms") or DEFAULT_PROFILE["allowed_sticker_terms"])
     detail_prefetch_limit = int(
         getattr(args, "detail_prefetch_limit", None)
         or profile.get("discovery", {}).get("detail_prefetch_limit")
@@ -400,6 +419,10 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
                 needs_detail.append(row)
             continue
         reason = is_excluded(candidate, excluded_terms)
+        if reason and not getattr(args, "include_excluded", False):
+            excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+            continue
+        reason = wear_or_sticker_filter(candidate, allowed_skin_wears, allowed_sticker_terms)
         if reason and not getattr(args, "include_excluded", False):
             excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
             continue
@@ -467,6 +490,10 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
             if reason and not getattr(args, "include_excluded", False):
                 excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
                 continue
+            reason = wear_or_sticker_filter(candidate, allowed_skin_wears, allowed_sticker_terms)
+            if reason and not getattr(args, "include_excluded", False):
+                excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+                continue
             if candidate.current_price is not None and candidate.current_price > price_cap:
                 excluded.append(
                     {
@@ -507,6 +534,8 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
             "price_cap_cny": price_cap,
             "candidate_limit": limit,
             "excluded_terms": excluded_terms,
+            "allowed_skin_wears": allowed_skin_wears,
+            "allowed_sticker_terms": allowed_sticker_terms,
             "include_excluded": getattr(args, "include_excluded", False),
         },
         "market_indexes": indexes,
