@@ -7,6 +7,18 @@
 
 目标不是让 AI 随口预测，而是让 Codex 按规则做同一件事：读取数据，套用规则，给出计划，记录结果，复盘改进。
 
+## New Session Entry
+
+未来任何 Codex / ChatGPT 会话进入本仓库，先读：
+
+```text
+AGENTS.md
+docs/operating_manual.md
+```
+
+`AGENTS.md` 是跨会话工作规范，规定默认流程、风控边界、检查清单和 Git 同步规则；`docs/operating_manual.md` 是完整使用手册。
+如果不知道某个文档负责什么，读 `docs/documentation_index.md`。
+
 ## Directory
 
 ```text

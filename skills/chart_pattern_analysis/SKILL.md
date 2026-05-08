@@ -1,5 +1,7 @@
 # Chart Pattern Analysis Skill
 
+> Legacy note: 新的通用图表流程以 `skills/trading_analysis/` 为准。本 skill 保留给旧会话和简单截图任务；如果涉及 CS2 饰品 K 线、交易日志或复盘，优先读 `AGENTS.md`、`docs/operating_manual.md` 和 `skills/trading_analysis/SKILL.md`。
+
 ## Use When
 
 用户提供 TradingView、Thinkorswim、MT4/MT5 图表截图，或要求做图表趋势、支撑阻力、入场止损止盈分析时使用。
@@ -31,4 +33,3 @@
 - 交易失效条件。
 
 缺少数据时必须写明，不允许补编图表上看不到的信息。
-

@@ -14,6 +14,8 @@
 
 ## Required Context
 
+- `AGENTS.md`
+- `docs/operating_manual.md`
 - `skills/trading_analysis/rules.md`
 - `skills/trading_analysis/output-template.md`
 - `docs/chart_analysis_rules.md`

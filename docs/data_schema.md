@@ -5,7 +5,7 @@
 保存路径：
 
 ```text
-data/snapshots/YYYY-MM-DD-cs2-snapshot.json
+data/snapshots/YYYY-MM-DD-HHMMSS-cs2-snapshot.json
 ```
 
 建议字段：
@@ -13,8 +13,18 @@ data/snapshots/YYYY-MM-DD-cs2-snapshot.json
 ```json
 {
   "snapshot_time": "2026-05-06T12:00:00+08:00",
-  "source": ["SteamDT", "CSQAQ"],
+  "source": {
+    "steamdt": {
+      "base_url": "https://open.steamdt.com",
+      "endpoints": ["/open/cs2/v1/price/batch", "/open/cs2/item/v1/kline"]
+    },
+    "csqaq": {
+      "base_url": "https://api.csqaq.com",
+      "endpoints": ["/api/v1/current_data"]
+    }
+  },
   "scan_scope": "watchlist",
+  "source_status": "live",
   "items": [
     {
       "market_hash_name": "AK-47 | Redline (Field-Tested)",
@@ -36,6 +46,8 @@ data/snapshots/YYYY-MM-DD-cs2-snapshot.json
         "trade_bias": "long_setup",
         "chart_score": 8.5,
         "score_adjustment": 2.8,
+        "change_7d_pct": 0,
+        "change_30d_pct": 0,
         "support_zone": [0, 0],
         "resistance_zone": [0, 0],
         "entry_zone": [0, 0],
