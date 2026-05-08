@@ -22,6 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from analyze_cs2_kline import analyze_candles
 from csqaq_discovery import build_discovery, load_profile as load_trading_profile, write_discovery
 
 
@@ -340,6 +341,7 @@ def compute_item_metrics(
     highs = [c["high"] for c in candles]
     lows = [c["low"] for c in candles]
     current_price = price_info.get("lowest_sell_price") or (closes[-1] if closes else None)
+    chart_analysis = analyze_candles(candles, current_price=current_price)
     recent_7 = closes[-8:] if len(closes) >= 8 else closes
     recent_30 = closes[-31:] if len(closes) >= 31 else closes
     change_7d = pct_change(current_price, recent_7[0] if recent_7 else None)
@@ -392,14 +394,40 @@ def compute_item_metrics(
         data_quality += 1
 
     sector_score = clamp(sector_score / 15 * 10, 0, 10)
-    total_score = round(momentum + risk + liquidity + sector_score + data_quality, 2)
-    bucket = classify_item(total_score, change_7d, risk, liquidity, spread_pct, current_price, watch_item.max_buy_price)
+    chart_adjustment = to_float(chart_analysis.get("score_adjustment")) or 0.0
+    total_score = round(momentum + risk + liquidity + sector_score + data_quality + chart_adjustment, 2)
+    bucket = classify_item(
+        total_score,
+        change_7d,
+        risk,
+        liquidity,
+        spread_pct,
+        current_price,
+        watch_item.max_buy_price,
+        chart_analysis,
+    )
 
-    stop_price = round(current_price * 0.95, 2) if current_price else None
-    target_price = round(current_price * 1.08, 2) if current_price else None
+    chart_stop = to_float(chart_analysis.get("stop_loss"))
+    chart_target = to_float(chart_analysis.get("take_profit"))
+    stop_price = round(chart_stop, 2) if current_price and chart_stop and chart_stop < current_price else (
+        round(current_price * 0.95, 2) if current_price else None
+    )
+    target_price = round(chart_target, 2) if current_price and chart_target and chart_target > current_price else (
+        round(current_price * 1.08, 2) if current_price else None
+    )
     stretched_target = round(current_price * 1.15, 2) if current_price else None
     buy_low = round(current_price * 0.98, 2) if current_price else None
     buy_high = round(current_price * 1.01, 2) if current_price else None
+    entry_zone = chart_analysis.get("entry_zone")
+    if chart_analysis.get("trade_bias") == "long_setup" and isinstance(entry_zone, list) and len(entry_zone) == 2:
+        entry_low = to_float(entry_zone[0])
+        entry_high = to_float(entry_zone[1])
+        if entry_low and entry_high:
+            buy_low, buy_high = round(entry_low, 2), round(entry_high, 2)
+    invalidation = invalidation_text(bucket)
+    chart_invalidation = chart_analysis.get("invalidation")
+    if chart_invalidation and bucket != "not_touch":
+        invalidation += f"；图表无效：{chart_invalidation}"
 
     return {
         "market_hash_name": watch_item.market_hash_name,
@@ -430,6 +458,7 @@ def compute_item_metrics(
             "liquidity": round(liquidity, 2),
             "sector": round(sector_score, 2),
             "data_quality": data_quality,
+            "chart_structure": round(chart_adjustment, 2),
         },
         "t7_score": total_score,
         "bucket": bucket,
@@ -437,9 +466,10 @@ def compute_item_metrics(
         "stop_or_reduce_price": stop_price,
         "target_price": target_price,
         "stretch_target_price": stretched_target,
+        "chart_analysis": chart_analysis,
         "position_suggestion": position_suggestion(bucket),
         "t7_exit_rule": t7_exit_rule(bucket),
-        "invalidation": invalidation_text(bucket),
+        "invalidation": invalidation,
         "data_quality_notes": data_quality_notes(price_info, candles, indexes),
         "raw_platform_prices": price_info.get("platforms", []),
     }
@@ -453,6 +483,7 @@ def classify_item(
     spread_pct: float | None,
     current_price: float | None,
     max_buy_price: float | None,
+    chart_analysis: dict[str, Any] | None = None,
 ) -> str:
     if current_price is None:
         return "not_touch"
@@ -462,9 +493,16 @@ def classify_item(
         return "not_touch"
     if liquidity < 6:
         return "not_touch"
+    chart_state = (chart_analysis or {}).get("structure_state")
+    chart_bias = (chart_analysis or {}).get("trade_bias")
+    if chart_state == "weak_breakdown" or chart_bias == "no_trade":
+        return "not_touch"
+
     if score >= 70 and (change_7d or 0) >= 3 and risk >= 14 and liquidity >= 10:
-        return "breakout"
+        return "breakout" if chart_bias == "long_setup" else "watch"
     if score >= 66 and risk >= 18:
+        if chart_state in {"overextended_no_chase", "range_wait_breakout", "mixed_wait_confirmation"}:
+            return "watch"
         return "steady"
     if score >= 50:
         return "watch"
@@ -700,7 +738,7 @@ def main() -> int:
         "errors": errors,
     }
     snapshot_path = write_snapshot(snapshot, out_dir)
-    print(f"Wrote snapshot: {snapshot_path}")
+    print(f"Wrote snapshot: {snapshot_path}", flush=True)
 
     if not args.skip_report:
         run_report(snapshot_path, (ROOT / args.report_out).resolve())

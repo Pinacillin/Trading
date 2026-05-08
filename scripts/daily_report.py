@@ -23,6 +23,24 @@ BUCKET_LABELS = {
     "not_touch": "不碰票",
 }
 
+CHART_LABELS = {
+    "bullish": "上涨",
+    "bearish": "下跌",
+    "range": "震荡",
+    "mixed": "混合",
+    "insufficient": "样本不足",
+    "breakout_candidate": "突破候选",
+    "pullback_candidate": "回踩候选",
+    "overextended_no_chase": "过热不追",
+    "range_wait_breakout": "箱体等待突破",
+    "mixed_wait_confirmation": "等待确认",
+    "weak_breakdown": "结构走弱",
+    "insufficient_data": "样本不足",
+    "long_setup": "可做多计划",
+    "wait": "等待",
+    "no_trade": "不交易",
+}
+
 
 def latest_snapshot(snapshot_dir: Path) -> Path:
     snapshots = sorted(snapshot_dir.glob("*-cs2-snapshot.json"), key=lambda path: path.stat().st_mtime)
@@ -43,6 +61,18 @@ def one_line(value: Any, limit: int = 300) -> str:
     return " ".join(str(value).split())[:limit]
 
 
+def chart_label(value: Any) -> str:
+    return CHART_LABELS.get(str(value), str(value) if value is not None else "N/A")
+
+
+def fmt_zone(value: Any) -> str:
+    if not isinstance(value, list) or len(value) != 2:
+        return "N/A"
+    if value[0] is None and value[1] is None:
+        return "N/A"
+    return f"{fmt(value[0])} - {fmt(value[1])}"
+
+
 def item_reason(item: dict[str, Any]) -> str:
     parts = item.get("score_parts", {})
     premium = item.get("bid_premium_pct")
@@ -57,13 +87,13 @@ def item_reason(item: dict[str, Any]) -> str:
         f"回撤 {fmt(item.get('drawdown_from_30d_high_pct'), '%')}，"
         f"点差 {fmt(item.get('spread_pct'), '%')}{premium_text}；"
         f"动量 {parts.get('momentum', 'N/A')} / 抗风险 {parts.get('risk_resilience', 'N/A')} / "
-        f"流动性 {parts.get('liquidity', 'N/A')}"
+        f"流动性 {parts.get('liquidity', 'N/A')} / 图表 {parts.get('chart_structure', 'N/A')}"
     )
 
 
 def render_bucket(items: list[dict[str, Any]], bucket: str) -> list[str]:
-    label = BUCKET_LABELS[bucket]
-    lines = [f"## {label}", ""]
+    bucket_label = BUCKET_LABELS[bucket]
+    lines = [f"## {bucket_label}", ""]
     selected = [item for item in items if item.get("bucket") == bucket]
     if not selected:
         lines += ["暂无。", ""]
@@ -85,6 +115,14 @@ def render_bucket(items: list[dict[str, Any]], bucket: str) -> list[str]:
             f"- 理由：{item_reason(item)}。",
             f"- 无效条件：{item.get('invalidation')}",
         ]
+        chart = item.get("chart_analysis") or {}
+        if chart:
+            lines += [
+                f"- 图表结构：趋势 {chart_label(chart.get('trend'))}；状态 {chart_label(chart.get('structure_state'))}；图表分 {fmt(chart.get('chart_score'))}，总分调整 {fmt(chart.get('score_adjustment'))}。",
+                f"- 关键价位：支撑 {fmt_zone(chart.get('support_zone'))}；阻力 {fmt_zone(chart.get('resistance_zone'))}；图表入场区 {fmt_zone(chart.get('entry_zone'))}。",
+                f"- 图表计划：{chart_label(chart.get('trade_bias'))}；图表止损 {fmt(chart.get('stop_loss'))}；图表目标 {fmt(chart.get('take_profit'))}；确认：{chart.get('confirmation') or 'N/A'}。",
+                "- 成交量提示：SteamDT 单品 K 线未提供成交量，`volume=0` 只代表缺失，不能当成真实成交量信号。",
+            ]
         notes = item.get("data_quality_notes") or []
         if notes:
             lines.append(f"- 数据质量提示：{', '.join(notes)}")

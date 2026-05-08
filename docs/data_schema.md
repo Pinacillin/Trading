@@ -30,6 +30,20 @@ data/snapshots/YYYY-MM-DD-cs2-snapshot.json
       "spread_pct": 0,
       "sector_score": 0,
       "t7_score": 0,
+      "chart_analysis": {
+        "trend": "bullish",
+        "structure_state": "breakout_candidate",
+        "trade_bias": "long_setup",
+        "chart_score": 8.5,
+        "score_adjustment": 2.8,
+        "support_zone": [0, 0],
+        "resistance_zone": [0, 0],
+        "entry_zone": [0, 0],
+        "stop_loss": 0,
+        "take_profit": 0,
+        "confirmation": "",
+        "invalidation": ""
+      },
       "bucket": "watch"
     }
   ]
@@ -132,3 +146,9 @@ timestamp,open,high,low,close,volume
 ```
 
 SteamDT 单品 K 线在这个流程里只有价格 OHLC，没有成交量，所以 `volume` 固定写成 `0`。这代表成交量缺失，不代表成交量为零。CS2 饰品是否可交易仍必须结合扫描器里的点差、同平台求购价、买盘深度、卖单深度、价格上限、品类过滤和 T+7 解锁时间判断。
+
+也可以单独对导出的 CSV 生成图表结构 JSON：
+
+```powershell
+python scripts\analyze_cs2_kline.py --csv data\charts\ohlcv\sample.csv
+```

@@ -52,6 +52,7 @@ python scripts\steamdt_scan.py
 ```
 
 脚本会先拉 CSQAQ 最新候选，再用 SteamDT 做深度验证。默认单品价格上限是 1000 CNY，不碰箱子、收藏包和胶囊；皮肤只看崭新出厂 / Factory New，印花只看全息 / Holo。
+每个深度扫描标的还会把 SteamDT 日 K 转成图表结构结论，自动写入总分和日报；但 CS2 单品 K 线没有成交量，所以图表只用于价格结构，T+7 可退出性仍由点差、同平台求购价和买卖深度决定。
 
 检查 CSQAQ 接口状态：
 
@@ -185,5 +186,11 @@ python scripts\export_steamdt_kline.py --name "AK-47 | Slate (Factory New)" --ba
 ```
 
 这会生成 `data/charts/ohlcv/*.csv`，字段为 `timestamp,open,high,low,close,volume`。SteamDT 单品 K 线在这里没有成交量，导出的 `volume` 固定为 `0`；分析 CS2 饰品图表时只能把它当作价格结构，是否可交易还必须回到 CS2 扫描器检查点差、同平台求购价、买盘深度、卖单深度和 T+7 退出条件。
+
+单独分析一个已导出的 CS2 K 线 CSV：
+
+```powershell
+python scripts\analyze_cs2_kline.py --csv data\charts\ohlcv\sample.csv
+```
 
 图表分析 MVP 的目标是先稳定记录 30-50 个样本，再根据实际结果调整规则；不要把单次截图分析当作确定预测。
