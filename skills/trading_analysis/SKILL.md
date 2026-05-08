@@ -2,7 +2,7 @@
 
 ## Use When
 
-用户提供 TradingView、Thinkorswim、MT4/MT5 截图，或提供 OHLCV 数据并要求输出趋势、支撑阻力、入场、止损、止盈、风险回报比、复盘记录时使用。
+用户提供 TradingView、Thinkorswim、MT4/MT5 截图，或提供 OHLCV 数据并要求输出趋势、支撑阻力、入场、止损、止盈、风险回报比、复盘记录时使用。CS2 饰品 K 线也可以走本流程，但 SteamDT 单品 K 线通常只有价格 OHLC、没有成交量。
 
 ## Priority
 
@@ -31,6 +31,8 @@
 5. Check setup quality:
    - Trend alignment.
    - Volume or momentum confirmation if visible.
+   - For CS2 item klines exported from SteamDT, treat `volume=0` as missing volume, not as bearish volume.
+   - For CS2 trades, confirm exitability with spread, same-platform bid, buy depth, sell depth, and T+7 unlock status from the CS2 scanner before producing an entry plan.
    - Risk/reward at least 1:2 unless the user explicitly sets another rule.
    - No nearby invalidation conflict.
 6. Produce exactly one primary plan:
@@ -59,4 +61,3 @@ Always include:
 - Journal Note
 
 Never present a chart idea as a guaranteed prediction. If the chart is unclear, output a wait/no-trade plan.
-

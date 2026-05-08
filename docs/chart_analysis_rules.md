@@ -2,7 +2,7 @@
 
 ## 目标
 
-用 TradingView / Thinkorswim / MT4/MT5 图表截图或 OHLCV 数据，按固定流程输出交易计划。
+用 TradingView / Thinkorswim / MT4/MT5 图表截图、OHLCV 数据，或 SteamDT 导出的 CS2 饰品日 K 数据，按固定流程输出交易计划。
 
 Codex 必须区分：
 
@@ -24,6 +24,12 @@ Codex 必须区分：
 - 用户已经画好的支撑阻力或趋势线。
 
 如果截图缺少关键信息，Codex 要明确写出缺失项，不允许假装知道。
+
+CS2 饰品 K 线额外要求：
+
+- 使用 `scripts/export_steamdt_kline.py` 导出的 CSV 时，`volume=0` 代表 SteamDT 未提供成交量，不代表真实成交量为零。
+- CS2 图表只能判断价格结构，不能单独给实时买入结论。
+- 输出任何 CS2 饰品交易计划前，必须结合 T+7 扫描器里的点差、同平台求购价、买盘深度、卖单深度、价格上限、品类过滤和解锁时间。
 
 ## 分析流程
 
@@ -109,4 +115,3 @@ Codex 必须区分：
 不交易理由：
 复盘记录：
 ```
-

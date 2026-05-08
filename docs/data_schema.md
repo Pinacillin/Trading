@@ -116,3 +116,19 @@ timestamp,open,high,low,close,volume
 ```text
 data/backtests/results/*-backtest.json
 ```
+
+### SteamDT CS2 item kline export
+
+`scripts/export_steamdt_kline.py` 会把 SteamDT `item/v1/kline` 的饰品日 K 转成上面的 OHLCV CSV：
+
+```powershell
+python scripts\export_steamdt_kline.py --name "AK-47 | Slate (Factory New)"
+```
+
+导出字段仍是：
+
+```text
+timestamp,open,high,low,close,volume
+```
+
+SteamDT 单品 K 线在这个流程里只有价格 OHLC，没有成交量，所以 `volume` 固定写成 `0`。这代表成交量缺失，不代表成交量为零。CS2 饰品是否可交易仍必须结合扫描器里的点差、同平台求购价、买盘深度、卖单深度、价格上限、品类过滤和 T+7 解锁时间判断。

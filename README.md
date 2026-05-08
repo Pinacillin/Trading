@@ -178,4 +178,12 @@ python scripts\summarize_chart_journal.py
 python scripts\backtest_strategy.py data\charts\ohlcv\sample.csv
 ```
 
+导出 CS2 饰品日 K 到同一套 OHLCV 工作流：
+
+```powershell
+python scripts\export_steamdt_kline.py --name "AK-47 | Slate (Factory New)" --backtest --journal
+```
+
+这会生成 `data/charts/ohlcv/*.csv`，字段为 `timestamp,open,high,low,close,volume`。SteamDT 单品 K 线在这里没有成交量，导出的 `volume` 固定为 `0`；分析 CS2 饰品图表时只能把它当作价格结构，是否可交易还必须回到 CS2 扫描器检查点差、同平台求购价、买盘深度、卖单深度和 T+7 退出条件。
+
 图表分析 MVP 的目标是先稳定记录 30-50 个样本，再根据实际结果调整规则；不要把单次截图分析当作确定预测。

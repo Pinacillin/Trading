@@ -8,6 +8,8 @@ data/snapshots/*.json
 data/snapshots/*.csv
 data/backtests/results/*
 !data/backtests/results/.gitkeep
+data/charts/ohlcv/*.csv
+data/charts/ohlcv/*.json
 data/charts/journal/chart-*.md
 reports/*.html
 reports/*.md

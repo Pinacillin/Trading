@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -55,6 +56,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--journal", default="data/charts/journal/chart_analyses.csv")
     parser.add_argument("--records-dir", default="data/charts/journal")
     return parser.parse_args()
+
+
+def safe_id_part(value: str) -> str:
+    normalized = value.strip().replace("|", " ")
+    normalized = re.sub(r"\s+", "_", normalized)
+    normalized = re.sub(r"[^A-Za-z0-9._()-]+", "_", normalized)
+    normalized = normalized.strip("._-")
+    return (normalized or "symbol")[:120]
 
 
 def to_float(value: str) -> float | None:
@@ -138,7 +147,7 @@ def markdown_record(row: dict[str, str]) -> str:
 def main() -> int:
     args = parse_args()
     now = datetime.now(timezone.utc).astimezone()
-    analysis_id = f"chart-{now.strftime('%Y%m%d-%H%M%S')}-{args.symbol.replace(' ', '_').replace('/', '_')}-{args.timeframe}"
+    analysis_id = f"chart-{now.strftime('%Y%m%d-%H%M%S')}-{safe_id_part(args.symbol)}-{safe_id_part(args.timeframe)}"
     rr = risk_reward(args.entry, args.stop_loss, args.take_profit, args.bias)
     row = {
         "analysis_id": analysis_id,
@@ -164,15 +173,16 @@ def main() -> int:
         "result_r": "",
         "result_notes": "",
     }
+    records_dir = (ROOT / args.records_dir).resolve() if not Path(args.records_dir).is_absolute() else Path(args.records_dir)
+    records_dir.mkdir(parents=True, exist_ok=True)
+    record_path = records_dir / f"{analysis_id}.md"
+    record_path.write_text(markdown_record(row), encoding="utf-8")
+
     journal_path = (ROOT / args.journal).resolve() if not Path(args.journal).is_absolute() else Path(args.journal)
     rows = load_rows(journal_path)
     rows.append(row)
     write_rows(journal_path, rows)
 
-    records_dir = (ROOT / args.records_dir).resolve() if not Path(args.records_dir).is_absolute() else Path(args.records_dir)
-    records_dir.mkdir(parents=True, exist_ok=True)
-    record_path = records_dir / f"{analysis_id}.md"
-    record_path.write_text(markdown_record(row), encoding="utf-8")
     print(f"Wrote chart journal row: {journal_path}")
     print(f"Wrote chart record: {record_path}")
     return 0
@@ -180,4 +190,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
