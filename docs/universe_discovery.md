@@ -10,7 +10,7 @@
 每次扫描 -> 先拉取最新市场数据 -> 动态生成候选池 -> 深度评分 -> 输出报告
 ```
 
-`config/watchlist.csv` 只作为“必须复查列表”，不能作为机会来源的主体。
+`config/watchlist.csv` 只作为“必须复查列表”，不能作为机会来源的主体。当前实现已经改为联合候选：CSQAQ、SteamDT base、观察池和最近快照都会参与 discovery。
 
 ## 当前观察池是什么
 
@@ -36,7 +36,7 @@
 系统必须区分三种扫描范围：
 
 - `watchlist`：只扫本地观察池，适合跟踪熟悉标的。
-- `discovery`：每次用 CSQAQ 排行榜、列表、价格数据重新生成候选池，再交给 SteamDT 验证。
+- `discovery`：每次联合 CSQAQ 排行榜/列表、SteamDT base、观察池和最近快照生成候选池，再交给 SteamDT 验证。
 - `full_market`：全市场扫描。只有当 API 权限、配额和数据完整性足够时才能这样标记。
 
 默认优先级：
@@ -65,7 +65,14 @@ discovery > watchlist
 
 ## 候选发现流程
 
-第一层：CSQAQ 粗筛
+第一层：联合候选粗筛
+
+- CSQAQ 排行榜/全量价格数据提供实时涨幅、价格、在售和求购视角。
+- SteamDT `/open/cs2/v1/base` 提供 Steam 官方 `marketHashName` 宇宙，使用 `data/snapshots/steamdt-base-cache.json` 做 24 小时缓存。
+- 最近成功快照提供近期已经验证过的高分或重点标的。
+- `config/watchlist.csv` 提供必须复查的种子标的。
+
+第二层：统一过滤
 
 - 排除箱子、收藏包、胶囊。
 - 只保留崭新出厂 / Factory New 的皮肤。
@@ -93,13 +100,13 @@ python scripts/csqaq_healthcheck.py
 
 只有 `current_data` 和 `rank_list` 都返回 `http=200`，才说明 discovery 可以正常拉新候选。
 
-第二层：SteamDT 验证
+第三层：SteamDT 验证
 
 - 用 `price/batch` 查平台最低价、最高求购价、卖单和买盘深度。
 - 用 `item/v1/kline` 查 7 日和 30 日走势。
 - 计算 T+7 分数。
 
-第三层：加入观察池
+第四层：加入观察池
 
 只有满足以下条件的标的才进入 `config/watchlist.csv`：
 

@@ -54,7 +54,7 @@ def request_json(method: str, url: str, token: str, body: Any = None) -> tuple[i
 def main() -> int:
     args = parse_args()
     load_dotenv(ROOT / ".env")
-    token = os.environ.get("CSQAQ_API_KEY")
+    token = os.environ.get("CSQAQ_API_KEY") or os.environ.get("CSQAQ_API_TOKEN")
     base_url = os.environ.get("CSQAQ_BASE_URL", "https://api.csqaq.com").rstrip("/")
     if not token:
         raise SystemExit("Missing CSQAQ_API_KEY in .env")

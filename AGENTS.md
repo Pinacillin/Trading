@@ -68,6 +68,7 @@ python scripts\csqaq_healthcheck.py --bind-ip
 默认 CS2 扫描规则：
 
 - 推荐入口优先 `discovery`，不是 `watchlist`。
+- `discovery` 使用联合候选：CSQAQ + SteamDT base + 最近快照 + 观察池。
 - 单品价格上限：1000 CNY。
 - 默认只考虑 Factory New / 崭新出厂皮肤，以及 Holo / 全息单张印花。
 - 默认排除箱子、武器箱、收藏包、纪念包、胶囊。

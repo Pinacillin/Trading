@@ -632,7 +632,11 @@ def main() -> int:
             discovery_path = write_discovery(discovery, (ROOT / args.out).resolve())
             print(f"Wrote discovery: {discovery_path}")
         items = watch_items_from_discovery(discovery, price_cap, deep_scan_limit)
-        scan_scope = f"discovery:{discovery.get('source', {}).get('csqaq', {}).get('source_status')}"
+        scan_scope = (
+            "discovery:joint_candidates;"
+            f"csqaq={discovery.get('source', {}).get('csqaq', {}).get('source_status')};"
+            f"steamdt={discovery.get('source', {}).get('steamdt', {}).get('source_status')}"
+        )
     elif args.mode == "holdings":
         holdings = (ROOT / args.holdings).resolve() if not Path(args.holdings).is_absolute() else Path(args.holdings)
         items = read_holdings(holdings)
@@ -649,7 +653,7 @@ def main() -> int:
 
     steamdt_base = os.environ.get("STEAMDT_BASE_URL", DEFAULT_STEAMDT_BASE_URL)
     csqaq_base = os.environ.get("CSQAQ_BASE_URL", DEFAULT_CSQAQ_BASE_URL)
-    csqaq_key = os.environ.get("CSQAQ_API_KEY")
+    csqaq_key = os.environ.get("CSQAQ_API_KEY") or os.environ.get("CSQAQ_API_TOKEN")
 
     names = [item.market_hash_name for item in items]
     out_dir = (ROOT / args.out).resolve()
@@ -712,6 +716,7 @@ def main() -> int:
                 "base_url": csqaq_base,
                 "endpoints": ["/api/v1/current_data"],
                 "discovery": (discovery or {}).get("source", {}).get("csqaq"),
+                "discovery_sources": (discovery or {}).get("source"),
             },
         },
         "mode": args.mode,
@@ -726,6 +731,8 @@ def main() -> int:
             "raw_count": (discovery or {}).get("raw_count"),
             "excluded_count": (discovery or {}).get("excluded_count"),
             "errors": (discovery or {}).get("errors"),
+            "source": (discovery or {}).get("source"),
+            "source_counts": (discovery or {}).get("source_counts"),
         },
         "excluded_count": len(excluded_items),
         "excluded_policy": "cases, collection packages, and capsules are excluded by default",

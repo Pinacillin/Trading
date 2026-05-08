@@ -6,8 +6,8 @@
 
 CS2 T+7 闭环：
 
-- CSQAQ 负责候选发现和大盘/板块指数。
-- SteamDT 负责平台价格、求购价、卖单/买盘深度和单品日 K。
+- CSQAQ 参与候选发现，并提供大盘/板块指数。
+- SteamDT base 参与候选补充；SteamDT price/kline 负责平台价格、求购价、卖单/买盘深度和单品日 K。
 - `steamdt_scan.py` 默认 discovery-first，生成结构化快照和 Markdown 日报。
 - `analyze_cs2_kline.py` 自动把 SteamDT 日 K 转成图表结构结论，并写入每个标的的 `chart_analysis`。
 - `daily_report.py` 输出爆发票、稳健票、观察票、不碰票，并显示图表趋势、支撑阻力、确认条件和无效条件。
@@ -56,6 +56,8 @@ docs/documentation_index.md
 
 ```text
 STEAMDT_API_KEY=
+CSQAQ_API_KEY=
+# Optional alias also accepted:
 CSQAQ_API_TOKEN=
 ```
 
@@ -94,8 +96,17 @@ python scripts\steamdt_scan.py
 默认流程：
 
 ```text
-CSQAQ discovery -> 排除箱子/收藏包/胶囊 -> 只保留 Factory New 皮肤和 Holo 印花 -> SteamDT 深度验证 -> K 线结构分析 -> T+7 评分 -> Markdown 日报
+CSQAQ discovery + SteamDT base + 本地观察池 + 最近快照 -> 排除箱子/收藏包/胶囊 -> 只保留 Factory New 皮肤和 Holo 印花 -> SteamDT 深度验证 -> K 线结构分析 -> T+7 评分 -> Markdown 日报
 ```
+
+候选发现是联合来源：
+
+- CSQAQ 排行榜/全量接口：提供涨幅、价格、热度和板块视角。
+- SteamDT `/open/cs2/v1/base`：提供 Steam 官方 `marketHashName` 宇宙，使用 24 小时本地缓存避免频繁打接口。
+- `config/watchlist.csv`：保证关注标的不会因为 discovery 失败而漏掉。
+- 最近 `data/snapshots/*-cs2-snapshot.json`：在 CSQAQ 异常时保留近期高分/持仓相关标的。
+
+如果 CSQAQ 不可用，系统不会直接空结果，而是降级为 SteamDT/base cache + 本地观察池 + 最近快照。报告会在“候选来源”和“数据风险”里标明这不是完整实时 discovery。
 
 输出：
 

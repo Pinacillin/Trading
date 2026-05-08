@@ -18,12 +18,19 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CSQAQ_BASE_URL = "https://api.csqaq.com"
+DEFAULT_STEAMDT_BASE_URL = "https://open.steamdt.com"
 DEFAULT_PROFILE = {
     "price_cap_cny": 1000,
     "excluded_terms": ["case", "weapon case", "capsule", "collection package", "souvenir package"],
     "allowed_skin_wears": ["Factory New", "崭新出厂"],
     "allowed_sticker_terms": ["Holo", "全息"],
-    "discovery": {"candidate_limit": 120, "page_size": 50, "max_pages": 5},
+    "discovery": {
+        "candidate_limit": 120,
+        "page_size": 50,
+        "max_pages": 5,
+        "steamdt_base_cache_hours": 24,
+        "recent_snapshot_limit": 80,
+    },
 }
 
 
@@ -125,6 +132,8 @@ def to_int(value: Any) -> int | None:
 
 def best_price(row: dict[str, Any]) -> float | None:
     values = [
+        to_float(row.get("lowest_sell_price")),
+        to_float(row.get("current_price")),
         to_float(row.get("buff_sell_price")),
         to_float(row.get("yyyp_sell_price")),
         to_float(row.get("c5_sell_price")),
@@ -140,6 +149,7 @@ def best_price(row: dict[str, Any]) -> float | None:
 
 def best_sell_count(row: dict[str, Any]) -> int | None:
     values = [
+        to_int(row.get("sell_order_count")),
         to_int(row.get("buff_sell_num")),
         to_int(row.get("yyyp_sell_num")),
         to_int(row.get("c5_sell_num")),
@@ -152,18 +162,20 @@ def best_sell_count(row: dict[str, Any]) -> int | None:
 
 def best_buy(row: dict[str, Any]) -> tuple[float | None, int | None]:
     prices = [
+        to_float(row.get("highest_buy_order")),
+        to_float(row.get("buy_price")),
         to_float(row.get("buff_buy_price")),
         to_float(row.get("yyyp_buy_price")),
         to_float(row.get("c5_buy_price")),
         to_float(row.get("steam_buy_price")),
-        to_float(row.get("buy_price")),
     ]
     counts = [
+        to_int(row.get("buy_order_count")),
+        to_int(row.get("buy_count")),
         to_int(row.get("buff_buy_num")),
         to_int(row.get("yyyp_buy_num")),
         to_int(row.get("c5_buy_num")),
         to_int(row.get("steam_buy_num")),
-        to_int(row.get("buy_num")),
     ]
     price_values = [value for value in prices if value and value > 0]
     count_values = [value for value in counts if value is not None]
@@ -230,9 +242,9 @@ def parse_candidate(row: dict[str, Any], source: str, id_map: dict[str, dict[str
         sell_count=best_sell_count(row),
         buy_price=buy_price,
         buy_count=buy_count,
-        change_1d_pct=to_float(row.get("sell_price_rate_1")),
-        change_7d_pct=to_float(row.get("sell_price_rate_7")),
-        change_30d_pct=to_float(row.get("sell_price_rate_30")),
+        change_1d_pct=to_float(row.get("sell_price_rate_1") or row.get("change_1d_pct")),
+        change_7d_pct=to_float(row.get("sell_price_rate_7") or row.get("change_7d_pct")),
+        change_30d_pct=to_float(row.get("sell_price_rate_30") or row.get("change_30d_pct")),
         source=source,
         raw=row,
     )
@@ -307,6 +319,67 @@ def fetch_all_goods_rank(base_url: str, headers: dict[str, str]) -> tuple[list[d
     return [row for row in rows if isinstance(row, dict)], id_map
 
 
+def unwrap_steamdt_response(response: Any) -> Any:
+    if isinstance(response, dict):
+        if response.get("success") is False:
+            code = response.get("errorCode") or response.get("code")
+            message = response.get("errorCodeStr") or response.get("msg") or response.get("errorMsg")
+            raise RuntimeError(f"SteamDT returned failure: {code} {message}")
+        return response.get("data", response)
+    return response
+
+
+def flatten_dict_lists(value: Any) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            if isinstance(item, dict):
+                rows.append(item)
+            else:
+                rows.extend(flatten_dict_lists(item))
+    elif isinstance(value, dict):
+        if any(key in value for key in ("marketHashName", "market_hash_name", "hash_name", "name")):
+            rows.append(value)
+        for key in ("list", "records", "rows", "items", "data", "result"):
+            if key in value:
+                rows.extend(flatten_dict_lists(value[key]))
+    return rows
+
+
+def fetch_steamdt_base_rows(
+    base_url: str,
+    api_key: str | None,
+    cache_path: Path,
+    cache_hours: float,
+) -> tuple[list[dict[str, Any]], str, list[str]]:
+    errors: list[str] = []
+    if cache_path.exists():
+        age_hours = (time.time() - cache_path.stat().st_mtime) / 3600
+        if age_hours <= cache_hours:
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            return flatten_dict_lists(cached.get("rows", cached)), "steamdt_base_cache", errors
+
+    if not api_key:
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            return flatten_dict_lists(cached.get("rows", cached)), "steamdt_base_cache_stale", ["steamdt_base: missing STEAMDT_API_KEY; using stale cache"]
+        return [], "steamdt_base_unavailable", ["steamdt_base: missing STEAMDT_API_KEY"]
+
+    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
+    try:
+        response = request_json("GET", f"{base_url.rstrip('/')}/open/cs2/v1/base", headers=headers)
+        rows = flatten_dict_lists(unwrap_steamdt_response(response))
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        cache_path.write_text(json.dumps({"fetched_at": datetime.now(timezone.utc).isoformat(), "rows": rows}, ensure_ascii=False), encoding="utf-8")
+        return rows, "steamdt_base_live", errors
+    except RuntimeError as exc:
+        errors.append(f"steamdt_base: {exc}")
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            return flatten_dict_lists(cached.get("rows", cached)), "steamdt_base_cache_stale", errors
+        return [], "steamdt_base_unavailable", errors
+
+
 def fetch_rank_pages(base_url: str, headers: dict[str, str], page_size: int, max_pages: int, request_sleep: float) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     sort_filters = [
@@ -354,11 +427,64 @@ def read_watchlist_fallback(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def dedupe_candidates(candidates: list[DiscoveryCandidate]) -> list[DiscoveryCandidate]:
+def read_recent_snapshot_rows(snapshot_dir: Path, limit: int) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    snapshots = sorted(snapshot_dir.glob("*-cs2-snapshot.json"), key=lambda path: path.stat().st_mtime, reverse=True)
+    seen: set[str] = set()
+    for snapshot_path in snapshots:
+        try:
+            snapshot = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        for item in snapshot.get("items", []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("market_hash_name") or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            rows.append(
+                {
+                    "market_hash_name": name,
+                    "name": name,
+                    "category": item.get("category"),
+                    "lowest_sell_price": item.get("lowest_sell_price"),
+                    "highest_buy_order": item.get("highest_buy_order"),
+                    "sell_order_count": item.get("sell_order_count"),
+                    "buy_order_count": item.get("buy_order_count"),
+                    "change_7d_pct": item.get("change_7d_pct"),
+                    "change_30d_pct": item.get("change_30d_pct"),
+                    "source_notes": f"snapshot={snapshot_path.name}; bucket={item.get('bucket')}; t7_score={item.get('t7_score')}",
+                }
+            )
+            if len(rows) >= limit:
+                return rows
+    return rows
+
+
+def source_weight(source: str) -> float:
+    if source.startswith("csqaq"):
+        return 8
+    if source.startswith("local_recent_snapshot"):
+        return 5
+    if source.startswith("local_watchlist"):
+        return 4
+    if source.startswith("steamdt_base_live"):
+        return 2
+    if source.startswith("steamdt_base_cache"):
+        return 1
+    return 0
+
+
+def score_for_dedupe(candidate: DiscoveryCandidate, price_cap: float) -> float:
+    return discovery_score(candidate, price_cap) + source_weight(candidate.source)
+
+
+def dedupe_candidates(candidates: list[DiscoveryCandidate], price_cap: float) -> list[DiscoveryCandidate]:
     merged: dict[str, DiscoveryCandidate] = {}
     for candidate in candidates:
         existing = merged.get(candidate.market_hash_name)
-        if existing is None or discovery_score(candidate, 1000) > discovery_score(existing, 1000):
+        if existing is None or score_for_dedupe(candidate, price_cap) > score_for_dedupe(existing, price_cap):
             merged[candidate.market_hash_name] = candidate
     return list(merged.values())
 
@@ -366,13 +492,17 @@ def dedupe_candidates(candidates: list[DiscoveryCandidate]) -> list[DiscoveryCan
 def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[str, Any]:
     load_dotenv(ROOT / ".env")
     base_url = os.environ.get("CSQAQ_BASE_URL", DEFAULT_CSQAQ_BASE_URL)
-    api_key = os.environ.get("CSQAQ_API_KEY")
+    api_key = os.environ.get("CSQAQ_API_KEY") or os.environ.get("CSQAQ_API_TOKEN")
+    steamdt_key = os.environ.get("STEAMDT_API_KEY")
+    steamdt_base_url = os.environ.get("STEAMDT_BASE_URL", DEFAULT_STEAMDT_BASE_URL)
     headers = {"ApiToken": api_key or "", "Content-Type": "application/json"}
     price_cap = float(getattr(args, "price_cap", None) or profile.get("price_cap_cny") or 1000)
     limit = int(getattr(args, "limit", None) or profile.get("discovery", {}).get("candidate_limit") or 120)
     page_size = int(profile.get("discovery", {}).get("page_size") or 50)
     max_pages = int(profile.get("discovery", {}).get("max_pages") or 5)
     request_sleep = float(profile.get("discovery", {}).get("request_sleep_seconds") or 1.2)
+    steamdt_cache_hours = float(profile.get("discovery", {}).get("steamdt_base_cache_hours") or 24)
+    recent_snapshot_limit = int(profile.get("discovery", {}).get("recent_snapshot_limit") or 80)
     excluded_terms = list(profile.get("excluded_terms") or DEFAULT_PROFILE["excluded_terms"])
     allowed_skin_wears = list(profile.get("allowed_skin_wears") or DEFAULT_PROFILE["allowed_skin_wears"])
     allowed_sticker_terms = list(profile.get("allowed_sticker_terms") or DEFAULT_PROFILE["allowed_sticker_terms"])
@@ -383,9 +513,10 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
     )
 
     errors: list[str] = []
-    source_status = "unknown"
-    rows: list[dict[str, Any]] = []
+    csqaq_source_status = "unavailable"
+    csqaq_rows: list[dict[str, Any]] = []
     id_map: dict[str, dict[str, Any]] | None = None
+    source_counts: dict[str, int] = {}
 
     for idx, (source_name, fetcher) in enumerate((
         ("csqaq_rank_pages", lambda: (fetch_rank_pages(base_url, headers, page_size, max_pages, request_sleep), None)),
@@ -395,9 +526,10 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
         if idx:
             time.sleep(request_sleep)
         try:
-            rows, id_map = fetcher()
-            if rows:
-                source_status = source_name
+            fetched_rows, id_map = fetcher()
+            if fetched_rows:
+                csqaq_rows = fetched_rows
+                csqaq_source_status = source_name
                 break
         except RuntimeError as exc:
             message = f"{source_name}: {exc}"
@@ -405,38 +537,63 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
             if "HTTP 429" in message:
                 break
 
-    if not rows:
-        rows = read_watchlist_fallback(ROOT / getattr(args, "watchlist", "config/watchlist.csv"))
-        source_status = "fallback_watchlist"
+    source_rows: list[tuple[str, list[dict[str, Any]], dict[str, dict[str, Any]] | None]] = []
+    if csqaq_rows:
+        source_rows.append((csqaq_source_status, csqaq_rows, id_map))
+        source_counts[csqaq_source_status] = len(csqaq_rows)
+
+    snapshot_rows = read_recent_snapshot_rows(ROOT / "data" / "snapshots", recent_snapshot_limit)
+    if snapshot_rows:
+        source_rows.append(("local_recent_snapshot", snapshot_rows, None))
+        source_counts["local_recent_snapshot"] = len(snapshot_rows)
+
+    watchlist_rows = read_watchlist_fallback(ROOT / getattr(args, "watchlist", "config/watchlist.csv"))
+    if watchlist_rows:
+        source_rows.append(("local_watchlist", watchlist_rows, None))
+        source_counts["local_watchlist"] = len(watchlist_rows)
+
+    steamdt_rows, steamdt_source_status, steamdt_errors = fetch_steamdt_base_rows(
+        steamdt_base_url,
+        steamdt_key,
+        ROOT / "data" / "snapshots" / "steamdt-base-cache.json",
+        steamdt_cache_hours,
+    )
+    errors.extend(steamdt_errors)
+    if steamdt_rows:
+        source_rows.append((steamdt_source_status, steamdt_rows, None))
+        source_counts[steamdt_source_status] = len(steamdt_rows)
 
     candidates: list[DiscoveryCandidate] = []
     needs_detail: list[dict[str, Any]] = []
     excluded: list[dict[str, Any]] = []
-    for row in rows:
-        candidate = parse_candidate(row, source_status, id_map)
-        if not candidate:
-            if row.get("id") or row.get("good_id"):
-                needs_detail.append(row)
-            continue
-        reason = is_excluded(candidate, excluded_terms)
-        if reason and not getattr(args, "include_excluded", False):
-            excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
-            continue
-        reason = wear_or_sticker_filter(candidate, allowed_skin_wears, allowed_sticker_terms)
-        if reason and not getattr(args, "include_excluded", False):
-            excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
-            continue
-        if candidate.current_price is not None and candidate.current_price > price_cap:
-            excluded.append(
-                {
-                    "market_hash_name": candidate.market_hash_name,
-                    "reason": f"price_above_{price_cap}",
-                    "current_price": candidate.current_price,
-                    "source": candidate.source,
-                }
-            )
-            continue
-        candidates.append(candidate)
+    total_raw_count = 0
+    for source_name, rows, source_id_map in source_rows:
+        total_raw_count += len(rows)
+        for row in rows:
+            candidate = parse_candidate(row, source_name, source_id_map)
+            if not candidate:
+                if source_name.startswith("csqaq") and (row.get("id") or row.get("good_id")):
+                    needs_detail.append(row)
+                continue
+            reason = is_excluded(candidate, excluded_terms)
+            if reason and not getattr(args, "include_excluded", False):
+                excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+                continue
+            reason = wear_or_sticker_filter(candidate, allowed_skin_wears, allowed_sticker_terms)
+            if reason and not getattr(args, "include_excluded", False):
+                excluded.append({"market_hash_name": candidate.market_hash_name, "reason": reason, "source": candidate.source})
+                continue
+            if candidate.current_price is not None and candidate.current_price > price_cap:
+                excluded.append(
+                    {
+                        "market_hash_name": candidate.market_hash_name,
+                        "reason": f"price_above_{price_cap}",
+                        "current_price": candidate.current_price,
+                        "source": candidate.source,
+                    }
+                )
+                continue
+            candidates.append(candidate)
 
     if needs_detail:
         rough_rows = []
@@ -448,7 +605,7 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
                         "market_hash_name": row.get("name") or row.get("id"),
                         "reason": f"price_above_{price_cap}",
                         "current_price": current_price,
-                        "source": source_status,
+                        "source": csqaq_source_status,
                     }
                 )
                 continue
@@ -464,7 +621,7 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
                     change_1d_pct=to_float(row.get("sell_price_rate_1")),
                     change_7d_pct=to_float(row.get("sell_price_rate_7")),
                     change_30d_pct=to_float(row.get("sell_price_rate_30")),
-                    source=source_status,
+                    source=csqaq_source_status,
                     raw=row,
                 ),
                 price_cap,
@@ -483,7 +640,7 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
                 continue
             merged = dict(row)
             merged.update(detail)
-            candidate = parse_candidate(merged, f"{source_status}+good_detail", id_map)
+            candidate = parse_candidate(merged, f"{csqaq_source_status}+good_detail", id_map)
             if not candidate:
                 continue
             reason = is_excluded(candidate, excluded_terms)
@@ -508,9 +665,9 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
 
     scored = [
         (candidate, discovery_score(candidate, price_cap))
-        for candidate in dedupe_candidates(candidates)
+        for candidate in dedupe_candidates(candidates, price_cap)
     ]
-    scored.sort(key=lambda row: row[1], reverse=True)
+    scored.sort(key=lambda row: (row[1] + source_weight(row[0].source), row[1]), reverse=True)
     top = scored[:limit]
 
     indexes: list[dict[str, Any]] = []
@@ -525,11 +682,22 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
         "source": {
             "csqaq": {
                 "base_url": base_url,
-                "source_status": source_status,
-                "is_full_market": source_status in {"csqaq_all_goods_info", "csqaq_all_goods_rank"},
-                "fallback_used": source_status == "fallback_watchlist",
-            }
+                "source_status": csqaq_source_status,
+                "is_full_market": csqaq_source_status in {"csqaq_all_goods_info", "csqaq_all_goods_rank"},
+                "fallback_used": not bool(csqaq_rows),
+            },
+            "steamdt": {
+                "base_url": steamdt_base_url,
+                "source_status": steamdt_source_status,
+                "cache_hours": steamdt_cache_hours,
+            },
+            "local": {
+                "watchlist_used": bool(watchlist_rows),
+                "recent_snapshot_used": bool(snapshot_rows),
+            },
         },
+        "source_status": "joint_candidates",
+        "source_counts": source_counts,
         "filters": {
             "price_cap_cny": price_cap,
             "candidate_limit": limit,
@@ -542,7 +710,7 @@ def build_discovery(profile: dict[str, Any], args: argparse.Namespace) -> dict[s
         "candidates": [candidate_to_dict(candidate, score) for candidate, score in top],
         "excluded_count": len(excluded),
         "excluded_sample": excluded[:50],
-        "raw_count": len(rows),
+        "raw_count": total_raw_count,
         "candidate_count": len(top),
         "errors": errors,
     }
@@ -564,7 +732,12 @@ def main() -> int:
     out_dir = (ROOT / args.out).resolve() if not Path(args.out).is_absolute() else Path(args.out)
     path = write_discovery(discovery, out_dir)
     print(f"Wrote discovery: {path}")
-    print(f"Source: {discovery['source']['csqaq']['source_status']}; candidates: {discovery['candidate_count']}; excluded: {discovery['excluded_count']}")
+    print(
+        "Sources: "
+        f"csqaq={discovery['source']['csqaq']['source_status']}; "
+        f"steamdt={discovery['source']['steamdt']['source_status']}; "
+        f"candidates={discovery['candidate_count']}; excluded={discovery['excluded_count']}"
+    )
     if discovery.get("errors"):
         print("Warnings:")
         for error in discovery["errors"][:5]:

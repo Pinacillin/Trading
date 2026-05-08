@@ -25,6 +25,8 @@
     "detail_prefetch_limit": 40,
     "page_size": 50,
     "max_pages": 5,
-    "request_sleep_seconds": 1.2
+    "request_sleep_seconds": 1.2,
+    "steamdt_base_cache_hours": 24,
+    "recent_snapshot_limit": 80
   }
 }

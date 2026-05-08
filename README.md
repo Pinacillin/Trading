@@ -63,7 +63,7 @@ Copy-Item .env.example .env
 python scripts\steamdt_scan.py
 ```
 
-脚本会先拉 CSQAQ 最新候选，再用 SteamDT 做深度验证。默认单品价格上限是 1000 CNY，不碰箱子、收藏包和胶囊；皮肤只看崭新出厂 / Factory New，印花只看全息 / Holo。
+脚本会联合 CSQAQ 最新候选、SteamDT base、最近快照和观察池生成候选，再用 SteamDT 做深度验证。默认单品价格上限是 1000 CNY，不碰箱子、收藏包和胶囊；皮肤只看崭新出厂 / Factory New，印花只看全息 / Holo。
 每个深度扫描标的还会把 SteamDT 日 K 转成图表结构结论，自动写入总分和日报；但 CS2 单品 K 线没有成交量，所以图表只用于价格结构，T+7 可退出性仍由点差、同平台求购价和买卖深度决定。
 
 检查 CSQAQ 接口状态：

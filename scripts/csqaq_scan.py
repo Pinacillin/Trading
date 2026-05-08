@@ -33,7 +33,7 @@ def load_dotenv(path: Path) -> None:
 def main() -> int:
     args = parse_args()
     load_dotenv(ROOT / ".env")
-    api_key = os.environ.get("CSQAQ_API_KEY")
+    api_key = os.environ.get("CSQAQ_API_KEY") or os.environ.get("CSQAQ_API_TOKEN")
     base_url = os.environ.get("CSQAQ_BASE_URL", "https://api.csqaq.com")
     if not base_url:
         raise SystemExit("Missing CSQAQ_BASE_URL. Add it to .env when the API contract is confirmed.")

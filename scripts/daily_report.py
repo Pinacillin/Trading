@@ -134,7 +134,11 @@ def render_report(snapshot: dict[str, Any], snapshot_path: Path) -> str:
     items = snapshot.get("items") or []
     indexes = snapshot.get("market_indexes") or []
     discovery = snapshot.get("discovery") or {}
-    source = (snapshot.get("source") or {}).get("csqaq", {}).get("discovery") or {}
+    source = (discovery.get("source") or (snapshot.get("source") or {}).get("csqaq", {}).get("discovery_sources") or {})
+    csqaq_source = source.get("csqaq") or (snapshot.get("source") or {}).get("csqaq", {}).get("discovery") or {}
+    source_counts = discovery.get("source_counts") or {}
+    steamdt_source = (source.get("steamdt") or {}) if isinstance(source, dict) else {}
+    local_source = (source.get("local") or {}) if isinstance(source, dict) else {}
     lines = [
         "# CS2 T+7 Daily Scan",
         "",
@@ -149,9 +153,12 @@ def render_report(snapshot: dict[str, Any], snapshot_path: Path) -> str:
         "",
         "## 候选来源",
         "",
-        f"- 来源状态：{source.get('source_status') or 'N/A'}",
-        f"- 是否全量：{source.get('is_full_market') if source else 'N/A'}",
-        f"- 是否降级：{source.get('fallback_used') if source else 'N/A'}",
+        f"- CSQAQ 来源：{csqaq_source.get('source_status') or 'N/A'}",
+        f"- SteamDT 候选源：{steamdt_source.get('source_status') or 'N/A'}",
+        f"- 本地补充：观察池 {local_source.get('watchlist_used') if local_source else 'N/A'}；最近快照 {local_source.get('recent_snapshot_used') if local_source else 'N/A'}",
+        f"- 来源计数：{json.dumps(source_counts, ensure_ascii=False) if source_counts else 'N/A'}",
+        f"- 是否全量：{csqaq_source.get('is_full_market') if csqaq_source else 'N/A'}",
+        f"- 是否降级：{csqaq_source.get('fallback_used') if csqaq_source else 'N/A'}",
         f"- Discovery 原始数量：{discovery.get('raw_count', 'N/A')}；入围数量：{discovery.get('candidate_count', 'N/A')}；排除数量：{discovery.get('excluded_count', 'N/A')}",
         "",
         "## 市场概况",
